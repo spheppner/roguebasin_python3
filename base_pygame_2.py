@@ -65,20 +65,44 @@ def write(background, text, x=50, y=150, color=(0, 0, 0),
         background.blit(surface, (x - width, y - height))
 
 
+class Tile:
+    """# a tile of the map and its properties
+       block_movement means blocking the movement of Monster/Player, like a wall
+       block_sight means blocking the field of view
+    """
+    def __init__(self, char, block_movement=None, block_sight=None):
+        self.char = char
+        self.block_movement = block_movement
+        self.block_sight = block_sight
+        # --- some common tiles ---
+        if char == "#":
+            self.block_movement = True
+            self.block_sight = True
+        elif char == ".":
+            self.block_movement = False
+            self.block_sight = False
+
+
 class Object():
 
     number = 0
-    # this is a generic object: the player, a monster, an item, the stairs...
+    # this is a generic dungeon object: the player, a monster, an item, the stairs...
     # it's always represented by a character (for text representation).
-    def __init__(self, x, y, z, char="?", color=None):
+    # NOTE: a dungeon tile (wall, floor, water..) is represented by the Tile class
+    def __init__(self, x, y, z=0, char="?", color=None):
         self.number = Object.number
         Object.number += 1
+        Game.objects[self.number] = self
         self.x = x
         self.y = y
         self.z = z
         self.char = char
         self.color = color
         self.hitpoints = 1 # objects with 0 or less hitpoints will be deleted
+        self._overwrite()
+
+    def _overwrite(self):
+        pass
 
     def is_member(self, name):
         """returns True if the instance is a member of the 'name' class or a child of it"""
@@ -94,16 +118,13 @@ class Object():
 
 
 class Monster(Object):
-    number = 0
 
-    def __init__(self, x, y, z=0, char="M"):
+    def _overwrite(self):
+        if self.color is None:
+            # yello as default color
+            self.color = (255,255,0)
 
-        Monster.number += 1
-        Game.objects[self.number] = self
-        self.x = x
-        self.y = y
-        self.z = z
-        self.char = char
+
 
     def move(self, dx, dy, dz=0):
         try:
@@ -111,7 +132,7 @@ class Monster(Object):
         except:
             raise SystemError("out of dungeon?", self.x,self.y,self.z)
         # --- check if monsters is trying to run into a wall ---
-        if target == "#":
+        if target.block_movement:
             print("ouch!")
             return
         self.x += dx
@@ -123,13 +144,13 @@ class Monster(Object):
 class Game():
 
     dungeon = [] # list of list of list. 3D map representation, using text chars. z,y,x !
-    objects = {} # collects all Object instances
+    objects = {} # container for all Object instances in this dungeon
     legend = {"@":"player",
               "#":"wall tile",
               ".":"floor tile"}
 
     def __init__(self, tiles_x=80, tiles_y=40, start_x=5, start_y=3):
-        self.player = Monster(start_x,start_y,char="@")
+        self.player = Monster(start_x,start_y,char="@", color=(0,0,255))
         self.create_empty_dungeon_level(tiles_x, tiles_y)
         #print(self.dungeon)
 
@@ -140,7 +161,8 @@ class Game():
         for y in range(max_y):
             line = []
             for x in range(max_x):
-                line.append("#" if y == 0 or y== max_y - 1 or x == 0 or x ==max_x-1 else ".")
+                #line.append("#" if y == 0 or y== max_y - 1 or x == 0 or x ==max_x-1 else ".")
+                line.append(Tile("#") if y == 0 or y== max_y - 1 or x == 0 or x ==max_x-1 else Tile("."))
             floor.append(line)
         Game.dungeon.append(floor)
 
@@ -199,7 +221,7 @@ class Viewer():
         self.background.convert()
 
     def create_tiles(self):
-        self.player_tile = make_text("@", font_color=(0,200,0), grid_size = self.grid_size)[0]
+        self.player_tile = make_text("@", font_color=self.game.player.color, grid_size = self.grid_size)[0]
         self.floor_tile =  make_text(".", font_color=(100,100,100), grid_size = self.grid_size)[0]
         self.wall_tile =   make_text("#", font_color=(128,128,128), grid_size = self.grid_size)[0]
         self.legend = {"@": self.player_tile,
@@ -211,7 +233,7 @@ class Viewer():
     def draw_dungeon(self):
         z  = self.game.player.z
         for y, line in enumerate(Game.dungeon[z]):
-            for x, char in enumerate(line):
+            for x, map_tile in enumerate(line):
                 # --- skip blitting dungeon tile if a object/monster sits there ---
                 for o in Game.objects.values():
                     # --- do not paint background if there is an object --
@@ -219,7 +241,7 @@ class Viewer():
                         break # blit nothing, if one object is found, do not search for others
                 else: # --- else in a for block means: the for loop was not exited by a break (no object was found at this place)
                     # ---- blit dungeon tile -----
-                    c = self.legend[char]
+                    c = self.legend[map_tile.char]
                     self.screen.blit(c, (x * self.grid_size[0],y * self.grid_size[1])) #* self.grid_size[0], y * self.grid_size[1]))
 
     def draw_non_monsters(self):
