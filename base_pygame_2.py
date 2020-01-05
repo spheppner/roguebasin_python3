@@ -13,7 +13,7 @@ import pygame
 import random
 #import inspect
 
-# import os
+import os
 
 
 def make_text(text="@", font_color=(255, 0, 255), font_size=48, font_name = "mono", bold=True, grid_size=None):
