@@ -175,7 +175,7 @@ class Tile():
 
 
 class Object():
-    """this is a generic dungeon object: the player, a monster, an item, the stairs...
+    """this is a generic dungeon object: the player, a monster, an item, a stair..
        it's always represented by a character (for text representation).
        NOTE: a dungeon tile (wall, floor, water..) is represented by the Tile class
     """
@@ -195,6 +195,11 @@ class Object():
         # --- make attributes out of all named arguments. like Object(hp=33) -> self.hp = 33
         for key, arg in kwargs.items():
             setattr(self, key, arg)
+        # ---- some default values ----
+        if "explored" not in kwargs:
+            self.explored = False
+        if "stay_visible_once_explored" not in kwargs:
+            self.stay_visible_once_explored = False
         # --- child classes can do stuff in the _overwrite() method  without needing their own __init__ method
         self._overwrite()
 
@@ -215,6 +220,11 @@ class Object():
             return True
         return False
 
+class Stair(Object):
+    """a stair, going upwards < or downwards >"""
+    def _overwrite(self):
+        self.color = (128,0,128) # violet
+        self.stay_visible_once_explored = True
 
 
 class Monster(Object):
@@ -233,7 +243,7 @@ class Monster(Object):
             raise SystemError("out of dungeon?", self.x,self.y,self.z)
         # --- check if monsters is trying to run into a wall ---
         if target.block_movement:
-            print("ouch!") # movement is not possible
+            Game.log.append("ouch!") # movement is not possible
             return
         self.x += dx
         self.y += dy
@@ -248,24 +258,28 @@ class Game():
     objects = {} # container for all Object instances in this dungeon
     legend = {"@":"player",
               "#":"wall tile",
-              ".":"floor tile"}
+              ".":"floor tile",
+              ">":"stair down",
+              "<":"stair up"}
 
     tiles_x = 0
     tiles_y = 0
-    start_x = 0
-    start_y = 0
     torch_radius = 10
+    log = [] # message log
+    game_over = False
 
     def __init__(self, tiles_x=80, tiles_y=40):
         Game.tiles_x = tiles_x  # width of the level in tiles
         Game.tiles_y = tiles_y  # height of the level in tiles, top row is 0, second row is 1 etc.
         #self.checked = set()   # like a list, but without duplicates. for fov calculation
         self.player = Monster(x=1,y=1,z=0,char="@", color=(0,0,255))
+        self.log.append("Welcome to the first dungeon level (level 0)!")
+        self.log.append("Use cursor keys to move around")
         # append empty dungeon level
         self.create_empty_dungeon_level(tiles_x, tiles_y, filled=True) # dungoen is full of walls,
         # carve out some rooms and tunnels in this new dungeon level
-        this_z = len(Game.dungeon) - 1
-        self.create_rooms_and_tunnels(z=this_z) # carve out some random rooms and tunnels, set the player in first room
+
+        self.create_rooms_and_tunnels(z=self.player.z) # carve out some random rooms and tunnels
 
     def create_rooms_and_tunnels(self, z=0, room_max_size = 10, room_min_size = 6, max_rooms = 30):
         """carve out some random rooms and connects them by tunnels. player is placed in the first room"""
@@ -301,28 +315,87 @@ class Game():
 
                 if num_rooms == 0:
                     # this is the first room, where the player starts at
-                    self.player.x = new_x
-                    self.player.y = new_y
+                    # create tunnel from player position to this room
+                    prev_x, prev_y = self.player.x, self.player.y
                 else:
-                    # all rooms after the first:
-                    # connect it to the previous room with a tunnel
-                    # center coordinates of previous room
                     (prev_x, prev_y) = rooms[num_rooms - 1].center()
-
-                    # draw a coin (random number that is either 0 or 1)
-                    if random.choice([0,1]) == 1:
-                        # first move horizontally, then vertically
-                        self.create_h_tunnel(prev_x, new_x, prev_y, z)
-                        self.create_v_tunnel(prev_y, new_y, new_x, z)
-                    else:
-                        # first move vertically, then horizontally
-                        self.create_v_tunnel(prev_y, new_y, prev_x, z)
-                        self.create_h_tunnel(prev_x, new_x, new_y, z)
-
-                    # finally, append the new room to the list
+                self.create_tunnel(prev_x,prev_y,new_x, new_y, z)
+                ### draw a coin (random number that is either 0 or 1)
+                ##if random.choice([0,1]) == 1:
+                ##    # first move horizontally, then vertically
+                ##    self.create_h_tunnel(prev_x, new_x, prev_y, z)
+                ##    self.create_v_tunnel(prev_y, new_y, new_x, z)
+                ##else:
+                ##    # first move vertically, then horizontally
+                ##    self.create_v_tunnel(prev_y, new_y, prev_x, z)
+                ##    self.create_h_tunnel(prev_x, new_x, new_y, z)
+                # finally, append the new room to the list
                 rooms.append(new_room)
                 num_rooms += 1
+        # --------- all rooms added. check stairs now -------
+        # ---------- stairs up ---------------
+        # check if this is level 0, add a single stair up
+        if z == 0:
+            # place stair up in a random room
+            r = random.choice(rooms)
+            Stair(r.center()[0], r.center()[1], z, char="<")
+        else:
+            # collect all stairs down from previous level,
+            # make at same position a stair up, carve a tunnel to a random room if necessary
+            stairlist = [(o.x, o.y) for o in Game.objects.values() if o.char == ">" and o.z == z - 1 and o.is_member("Stair")]
+            print("creating prev stairlist:", stairlist)
+            for (x, y) in stairlist:
+                if Game.dungeon[z][y][x].char != ".":
+                    # carve tunnel to random room center
+                    r = random.choice(rooms)
+                    self.create_tunnel(x,y, r.center()[0], r.center()[1],z)
+                # make a stair! 
+                Stair(x, y, z, char="<")
+        # ------------------ stairs down ----------------
+        # select up to 3 random rooms and place a stair down in it's center
+        num_stairs = 0
+        stairs = random.randint(1,3)
+        print("creating stairs down...")
+        while num_stairs < stairs:
+            r = random.choice(rooms)
+            x,y = r.center()
+            # is there already any object at this position?
+            objects_here = [o for o in Game.objects.values() if o.z == z and o.x == x and o.y == y]
+            if len(objects_here) > 0:
+                continue
+            Stair(x,y,z, char=">")
+            num_stairs += 1
 
+
+
+
+
+
+
+
+
+
+    def ascend(self):
+        """go up one dungeon level (or leave the game if already at level 0)"""
+        if self.player.z == 0:
+            Game.log.append("You climb back to the surface and leave the dungeon. Good Bye!")
+            print(Game.log[-1])
+            Game.game_over = True
+        else:
+            Game.log.append("climbing up one level....")
+            self.player.z -= 1
+
+    def descend(self):
+        """go down one dungeon level. create this level if necessary """
+        Game.log.append("climbing down one level, deeper into the dungeon...")
+        try:
+            l = Game.dungeon[self.player.z +1]
+        except:
+            Game.log.append("please wait a bit, i must create this level...")
+            self.create_empty_dungeon_level(Game.tiles_x, Game.tiles_y)
+            self.create_rooms_and_tunnels(z=self.player.z+1)
+        self.player.z += 1
+        #return True
 
     def create_empty_dungeon_level(self, max_x, max_y, filled=True):
         """creates empty dungeon level and append it to Game.dungeon
@@ -357,6 +430,17 @@ class Game():
         """create an vertical tunnel in dungeon level z (filled with floor tiles)"""
         for y in range(min(y1, y2), max(y1, y2) + 1):
             Game.dungeon[z][y][x] = Tile(".")  # replace whatever tile that was there before with a floor
+
+
+    def create_tunnel(self, x1, y1, x2, y2, z=0):
+        if random.choice([0, 1]) == 1:
+            # first move horizontally, then vertically
+            self.create_h_tunnel(x1, x2, y1, z)
+            self.create_v_tunnel(y1, y2, x2, z)
+        else:
+            # first move vertically, then horizontally
+            self.create_v_tunnel(y1, y2, x1, z)
+            self.create_h_tunnel(x1, x2, y2, z)
 
     def make_fov_map(self):
         Game.fov_map = []
@@ -474,14 +558,21 @@ class Viewer():
         # player center in pixel
         self.pcx = (width - Viewer.panel_width) // 2  # set player in the middle of the screen
         self.pcy = (height - Viewer.log_height) // 2
-        # radar center in pixel
-        self.rcx = width - Viewer.panel_width + Viewer.panel_width // 2
-        self.rcy = Viewer.panel_width // 2
         self.radarblipsize = 4 # pixel
+        self.logscreen_fontsize = 10
         self.screen = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
         self.clock = pygame.time.Clock()
         self.fps = fps
         self.playtime = 0.0
+        # ------ surfaces for radar, panel and log ----
+        # all surfaces are black by default
+        self.radarscreen = pygame.surface.Surface((Viewer.panel_width, Viewer.panel_width))  # same width and height as panel, sits in topright corner of screen
+        self.panelscreen =   pygame.surface.Surface((Viewer.panel_width, Viewer.height-Viewer.panel_width))
+        self.logscreen = pygame.surface.Surface((Viewer.width - Viewer.panel_width, Viewer.log_height))
+        # radar screen center
+        self.rcx = Viewer.panel_width // 2
+        self.rcy = Viewer.panel_width // 2
+
         # ------ background images ------
         self.backgroundfilenames = []  # every .jpg or .jpeg file in the folder 'data'
         self.make_background()
@@ -524,13 +615,17 @@ class Viewer():
         self.floor_tile_light = make_text(".", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
         self.wall_tile_dark =   make_text("#", font_color=(0,0,100), grid_size = self.grid_size)[0]
         self.wall_tile_light = make_text("#", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
-        self.unknown_tile = make_text("?", font_color=(14,14,14),  grid_size=self.grid_size)[0]
+        self.unknown_tile  = make_text("?", font_color=(14,14,14),  grid_size=self.grid_size)[0]
+        self.stair_up_tile = make_text("<", font_color=(128,0,128),  grid_size=self.grid_size)[0]
+        self.stair_down_tile=make_text(">", font_color=(128,255,128),  grid_size=self.grid_size)[0]
         self.legend = {"@": self.player_tile,
                        ".": self.floor_tile_light,
                        "#": self.wall_tile_light,
                        ":": self.floor_tile_dark,
                        "X": self.wall_tile_dark,
-                       "?": self.unknown_tile}
+                       "?": self.unknown_tile,
+                       "<": self.stair_up_tile,
+                       ">": self.stair_down_tile}
 
     def tile_blit(self, surface, x_pos, y_pos):
         """correctly blits a surface at tile-position x,y, so that the player is always centered at pcx, pcy"""
@@ -551,11 +646,9 @@ class Viewer():
             for x, map_tile in enumerate(line):
                 distance = ((x - px) ** 2 + (y - py) ** 2) ** 0.5
                 # ---- check if tiles is outside torch radius of player ----
-                # ---- or otherwise invisible
-
+                # ---- or otherwise (mostly) invisible
                 if distance > Game.torch_radius or Game.fov_map[y][x] == False:
-                    # -- only blit (dark) if tile is explored. Do not test for Monster and items ---
-                    # TODO: non-movable Items (stairs) should be remain explored and visible outside Fog of War
+                    # -- only blit (dark) if tile is explored. only draw explored Items (stairs)
                     if map_tile.explored:
                         if map_tile.char == "#":
                             c = self.wall_tile_dark
@@ -568,6 +661,10 @@ class Viewer():
                     #self.screen.blit(c, (x * self.grid_size[0], y * self.grid_size[1]))  # * self.grid_size[0], y * self.grid_size[1]))
                     #self.screen.blit(c, (x * self.grid_size[0], y * self.grid_size[1]))  # * self.grid_size[0], y * self.grid_size[1]))
                     self.tile_blit(c, x, y)
+                    # ---- maybe a perma-visible objects lay here ? ---
+                    olist = [o for o in Game.objects.values() if o.explored and o.stay_visible_once_explored and o.z==z and o.y==y and o.x == x]
+                    for o in olist:
+                        self.tile_blit(self.legend[o.char], x,y)
                     continue # next tile, please
                 # ==============================================
                 # ---- we are inside the torch radius ---
@@ -580,9 +677,9 @@ class Viewer():
                 c = self.legend[map_tile.char] # light tiles
                 #self.screen.blit(c, (x * self.grid_size[0], y * self.grid_size[1]))
                 #self.screen.blit(c, (x * self.grid_size[0], y * self.grid_size[1]))
-                self.tile_blit(c, x, y)
-                self.draw_non_monsters(x,y)
-                self.draw_monsters(x,y)
+                self.tile_blit(c, x, y)      # first, blit the dungeon tile
+                self.draw_non_monsters(x,y) # then, blit any items (stairs) on it
+                self.draw_monsters(x,y)    # then, blit any monsters
 
 
     def draw_non_monsters(self, x, y):
@@ -591,9 +688,10 @@ class Viewer():
             if o.z == z and o.y == y and o.x == x:  # only care if in the correct dungeon level
                 # -- only care if NOT: Monster class instances or instances that are a child of the Monster class
                 if not o.is_member("Monster"):
-                    c = self.legend[m.char]
+                    c = self.legend[o.char]
+                    o.explored = True
                     #self.screen.blit(c, (m.x * self.grid_size[0], m.y * self.grid_size[1]))
-                    self.tile_blit(c, m.x, m.y)
+                    self.tile_blit(c, o.x, o.y)
 
     def draw_monsters(self, x, y):
         z = self.game.player.z
@@ -604,15 +702,15 @@ class Viewer():
                     c = self.legend[o.char]
                     #self.screen.blit(c, (o.x * self.grid_size[0], o.y * self.grid_size[1]))
                     if o == self.game.player:
-                        self.screen.blit(c, (self.pcx, self.pcy))
+                        self.screen.blit(c, (self.pcx, self.pcy)) # blit the player always in middle of screen
                     else:
+                        o.explored = True
                         self.tile_blit(c, o.x, o.y)
                     break # one monster per tile is enough
 
     def draw_radar(self):
         # make black square in top of panel
-        pygame.draw.rect(self.screen, (10,10,10), (Viewer.width-Viewer.panel_width, 0, Viewer.panel_width,Viewer.panel_width))
-
+        self.radarscreen.fill((10,10,10)) # clear radarscreen
         delta_tiles = int(self.panel_width / 2 // self.radarblipsize)
         # make a radar blit for each explored dungeong tile
         for x in range(self.game.player.x-delta_tiles, self.game.player.x+delta_tiles+1):
@@ -632,31 +730,67 @@ class Viewer():
                         color = (150,150,150) # light grey corridor
                     dx = -(x - self.game.player.x) * self.radarblipsize
                     dy = -(y - self.game.player.y) * self.radarblipsize
-                    pygame.draw.rect(self.screen, color,(self.rcx-dx, self.rcy-dy, self.radarblipsize, self.radarblipsize))
+                    pygame.draw.rect(self.radarscreen, color,(self.rcx-dx, self.rcy-dy, self.radarblipsize, self.radarblipsize))
+                # ---if a stair is there, paint it (if explored) ---
+                for o in Game.objects.values():
+                    if o.z == self.game.player.z and o.y==y and o.x==x and o.is_member("Stair") and o.explored:
+                        if o.char==">":
+                            color = (128,0,128)
+                        else:
+                            color = (128,255,128)
+                        pygame.draw.rect(self.radarscreen, color, (self.rcx-dx, self.rcy-dy, self.radarblipsize, self.radarblipsize))
         # make withe glowing dot at center of radarmap
         white = random.randint(200, 255)
         color = (white, white, white)
-        pygame.draw.rect(self.screen, color,(self.rcx , self.rcy , self.radarblipsize, self.radarblipsize))
+        pygame.draw.rect(self.radarscreen, color,(self.rcx , self.rcy , self.radarblipsize, self.radarblipsize))
+        # blit radarscreen on screen
+        self.screen.blit(self.radarscreen, (Viewer.width - Viewer.panel_width, 0))
 
     def draw_panel(self):
-        pygame.draw.rect(self.screen, (64,128,64), (Viewer.width-Viewer.panel_width, Viewer.panel_width, Viewer.panel_width, Viewer.height-Viewer.panel_width))
+        # fill panelscreen with color
+        self.panelscreen.fill((64, 128, 64))
+        # write stuff in the panel
+        write(self.panelscreen, text="level: {}".format(self.game.player.z), x=5, y=5, color=(255, 255, 255))
+        # blit panelscreen
+        self.screen.blit(self.panelscreen, (Viewer.width-self.panel_width, self.panel_width))
 
     def draw_log(self):
-        pygame.draw.rect(self.screen, (150,150,150), (0, Viewer.height - Viewer.log_height, Viewer.width-Viewer.panel_width, Viewer.log_height))
+        # fill logscreen with color
+        self.logscreen.fill((150,150,150))
+
+
+        # write the log lines, from bottom (last log line) to top.
+        for i in range(-1, -25, -1): # start, stop, step
+            try:
+                text = Game.log[i]
+            except:
+                continue
+            textsf, (w,h) = make_text(text, font_size = self.logscreen_fontsize)
+            self.logscreen.blit(textsf, (5, self.log_height + i * h))
+        # ---- blit logscreen ------
+        self.screen.blit(self.logscreen, (0, Viewer.height - self.log_height))
 
     def run(self):
         """The mainloop"""
         running = True
-        pygame.mouse.set_visible(False)
+        pygame.mouse.set_visible(True)
         oldleft, oldmiddle, oldright = False, False, False
         self.game.make_fov_map()
         self.redraw = True
         #exittime = 0
+        old_z = 999 # old z position of player
         while running:
+            if Game.game_over:
+                running = False
             milliseconds = self.clock.tick(self.fps)  #
             seconds = milliseconds / 1000
             self.playtime += seconds
-            recalculate_fov = False
+            # --- check if the player has changed the dungeon level
+            if old_z != self.game.player.z:
+                recalculate_fov = True
+            else:
+                recalculate_fov = False
+            old_z = self.game.player.z
 
             # -------- events ------
             for event in pygame.event.get():
@@ -682,6 +816,12 @@ class Viewer():
                     if event.key == pygame.K_SPACE:
                         # wait a turn
                         self.redraw = False
+                    if event.key == pygame.K_PAGEUP:
+                        # go up a level
+                        self.game.ascend()
+                    if event.key == pygame.K_PAGEDOWN:
+                        ready = self.game.descend()
+                        #print("ready:", ready)
                     if event.key == pygame.K_r:
                         # zoom out radar
                         self.radarblipsize *= 0.5
