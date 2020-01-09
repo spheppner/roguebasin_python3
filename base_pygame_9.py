@@ -277,10 +277,12 @@ class Game():
         self.log.append("Use cursor keys to move around")
         self.load_level(0, "level001.txt", ".")
         self.load_level(1, "level002.txt", ".")
+        self.load_level(2, "level003.txt", ".")
 
-        self.create_empty_dungeon_level(tiles_x, tiles_y, filled=True, z=2) # dungoen is full of walls,
+        
+        self.create_empty_dungeon_level(tiles_x, tiles_y, filled=True, z=3) # dungoen is full of walls,
         # carve out some rooms and tunnels in this new dungeon level
-        self.create_rooms_and_tunnels(z=2) # carve out some random rooms and tunnels
+        self.create_rooms_and_tunnels(z=3) # carve out some random rooms and tunnels
         # append empty dungeon level
 
 
@@ -421,7 +423,8 @@ class Game():
             l = Game.dungeon[self.player.z +1]
         except:
             Game.log.append("please wait a bit, i must create this level...")
-            self.create_empty_dungeon_level(Game.tiles_x, Game.tiles_y)
+            self.create_empty_dungeon_level(Game.tiles_x, Game.tiles_y, 
+                                            z=self.player.z+1)
             self.create_rooms_and_tunnels(z=self.player.z+1)
         self.player.z += 1
         #return True
