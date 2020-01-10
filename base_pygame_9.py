@@ -165,13 +165,17 @@ class Tile():
         self.block_movement = block_movement
         self.block_sight = block_sight
         self.explored = explored
+        # graphic_index is a random number to choose one of several graphical tiles
+        self.graphic_index = random.randint(1,4)
         # --- some common tiles ---
         if char == "#":   # wall
             self.block_movement = True
             self.block_sight = True
+            self.i = random.randint(1,10)
         elif char == ".": # floor
             self.block_movement = False
             self.block_sight = False
+            #self.i = random.randint(1,10)
 
 
 class Object():
@@ -234,6 +238,8 @@ class Monster(Object):
         if self.color is None:
             # yello as default color
             self.color = (255,255,0)
+        if "hitpoints_max" not in kwargs:
+            self.hitpoints_max = self.hitpoints
 
 
     def move(self, dx, dy, dz=0):
@@ -243,12 +249,21 @@ class Monster(Object):
             raise SystemError("out of dungeon?", self.x,self.y,self.z)
         # --- check if monsters is trying to run into a wall ---
         if target.block_movement:
+            self.hitpoints -= 1
             Game.log.append("ouch!") # movement is not possible
             return
         self.x += dx
         self.y += dy
         self.z += dz
 
+class Player(Monster):
+
+    def _overwrite(self):
+        self.char = "@"
+        self.color = (0, 0, 255)
+        self.hitpoints = 100
+        self.hitpoints_max = 100
+        self.items = {}
 
 
 class Game():
@@ -272,19 +287,22 @@ class Game():
         Game.tiles_x = tiles_x  # width of the level in tiles
         Game.tiles_y = tiles_y  # height of the level in tiles, top row is 0, second row is 1 etc.
         #self.checked = set()   # like a list, but without duplicates. for fov calculation
-        self.player = Monster(x=1,y=1,z=0,char="@", color=(0,0,255))
+        self.player = Player(x=1,y=1,z=0)
         self.log.append("Welcome to the first dungeon level (level 0)!")
         self.log.append("Use cursor keys to move around")
-        self.load_level(0, "level001.txt", ".")
-        self.load_level(1, "level002.txt", ".")
-        self.load_level(2, "level003.txt", ".")
+        self.load_level(0, "level001.txt", "data")
+        self.load_level(1, "level002.txt", "data")
+        self.load_level(2, "level003.txt", "data")
 
-        
+
         self.create_empty_dungeon_level(tiles_x, tiles_y, filled=True, z=3) # dungoen is full of walls,
         # carve out some rooms and tunnels in this new dungeon level
         self.create_rooms_and_tunnels(z=3) # carve out some random rooms and tunnels
         # append empty dungeon level
 
+    def check_player(self):
+        if self.player.hitpoints <= 0:
+            Game.game_over = True
 
     def load_level(self, z, name, folder="data"):
         """load a text file and return a list of non-empty lines without newline characters"""
@@ -423,7 +441,7 @@ class Game():
             l = Game.dungeon[self.player.z +1]
         except:
             Game.log.append("please wait a bit, i must create this level...")
-            self.create_empty_dungeon_level(Game.tiles_x, Game.tiles_y, 
+            self.create_empty_dungeon_level(Game.tiles_x, Game.tiles_y,
                                             z=self.player.z+1)
             self.create_rooms_and_tunnels(z=self.player.z+1)
         self.player.z += 1
@@ -434,6 +452,8 @@ class Game():
            if "filled" is False with floor tiles ('.') and an outer wall ('#')
            otherwise all is filled with walls
         """
+        # TODO: check max x,y from doors in previous level, randomize level dimension
+        # TODO: create tunnel from stair to closest room, not to random room
         floor = []
         for y in range(max_y):
             line = []
@@ -646,11 +666,49 @@ class Viewer():
         self.background.convert()
 
     def create_tiles(self):
+        """create tiles for blitting"""
+        self.darkwalls = []
+        self.lightwalls = []
+        self.darkfloors = []
+        self.lightfloors = []
+
+        walls_img = pygame.image.load(os.path.join("data", "wall.png")) # spritesheet 32x32 pixel
+        floors_img = pygame.image.load(os.path.join("data", "floor.png")) # spritesheet 32x32 pixel
+        walls_dark_img = walls_img.copy()
+        floors_dark_img = floors_img.copy()
+        # blit a darker picture over the original to darken
+        darken_percent = .25
+        for (original, copy) in [(walls_img, walls_dark_img),(floors_img, floors_dark_img)]:
+            dark = pygame.surface.Surface(original.get_size()).convert_alpha()
+            dark.fill((0, 0, 0, darken_percent * 255))
+            copy.blit(dark, (0, 0)) # blit dark surface over original
+        # get a list of floor tiles and another list of wall tiles, each with an index
+        for (original, targetlist, width, height) in ((walls_img, self.lightwalls, 32, 32),
+                                       (walls_dark_img, self.darkwalls, 32, 32),
+                                       (floors_img, self.lightfloors, 32, 32),
+                                       (floors_dark_img, self.darkfloors, 32, 32)):
+            size_x, size_y = original.get_size()
+            #print(original, "size:", size_x, size_y)
+            for y in range(0, size_y +1, height):
+                for x in range(0, size_x+1, width):
+                    img = pygame.surface.Surface((width, height))
+                    img.blit(original, (0,0), (x, y, width, height) )
+                    img.convert()
+                    targetlist.append(img)
+
+
+
+
+
         self.player_tile = make_text("@", font_color=self.game.player.color, grid_size = self.grid_size)[0]
         self.floor_tile_dark =  make_text(".", font_color=(50,50,150), grid_size = self.grid_size)[0]
         self.floor_tile_light = make_text(".", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
+        #self.floor_tile_dark = self.darkfloors[7*32+5]
+        #self.floor_tile_light = self.lightfloors[7*32+5]
         self.wall_tile_dark =   make_text("#", font_color=(0,0,100), grid_size = self.grid_size)[0]
+        #self.wall_tile_dark = self.darkwalls[0]
         self.wall_tile_light = make_text("#", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
+        #self.wall_tile_light = self.lightwalls[0]
         self.unknown_tile  = make_text("?", font_color=(14,14,14),  grid_size=self.grid_size)[0]
         self.stair_up_tile = make_text("<", font_color=(128,0,128),  grid_size=self.grid_size)[0]
         self.stair_down_tile=make_text(">", font_color=(128,255,128),  grid_size=self.grid_size)[0]
@@ -688,6 +746,8 @@ class Viewer():
                     if map_tile.explored:
                         if map_tile.char == "#":
                             c = self.wall_tile_dark
+                            #print(map_tile.i)
+                            #c = self.darkwalls[map_tile.i]
                         elif map_tile.char == ".":
                             c = self.floor_tile_dark
                         else:
@@ -772,9 +832,9 @@ class Viewer():
                 for o in Game.objects.values():
                     if o.z == self.game.player.z and o.y==y and o.x==x and o.is_member("Stair") and o.explored:
                         if o.char==">":
-                            color = (128,0,128)
-                        else:
                             color = (128,255,128)
+                        else:
+                            color = (128,0,128)
                         pygame.draw.rect(self.radarscreen, color, (self.rcx-dx, self.rcy-dy, self.radarblipsize, self.radarblipsize))
         # make withe glowing dot at center of radarmap
         white = random.randint(200, 255)
@@ -787,7 +847,20 @@ class Viewer():
         # fill panelscreen with color
         self.panelscreen.fill((64, 128, 64))
         # write stuff in the panel
-        write(self.panelscreen, text="level: {}".format(self.game.player.z), x=5, y=5, color=(255, 255, 255))
+        write(self.panelscreen, text="dungeon: {}".format(self.game.player.z), x=5, y=5, color=(255, 255, 255))
+        #cheering = ["go, Hero, go!",
+        #            "come on, man!",
+        #            "Yeah!", "That's cool!"]
+        #write(self.panelscreen, text=random.choice(cheering),
+        #        x=5, y=25)
+        # - hitpoint bar in red, starting left
+        pygame.draw.rect(self.panelscreen, (200, 0, 0),
+                         (0, 35, self.game.player.hitpoints * Viewer.panel_width / self.game.player.hitpoints_max, 28))
+        write(self.panelscreen, text="hp: {}/{}".format(
+               self.game.player.hitpoints, self.game.player.hitpoints_max), x=5, y=35,
+               color=(255,255,255), font_size=24)
+        
+
         # blit panelscreen
         self.screen.blit(self.panelscreen, (Viewer.width-self.panel_width, self.panel_width))
 
@@ -817,6 +890,7 @@ class Viewer():
         #exittime = 0
         old_z = 999 # old z position of player
         while running:
+            self.game.check_player()
             if Game.game_over:
                 running = False
             milliseconds = self.clock.tick(self.fps)  #
@@ -881,8 +955,6 @@ class Viewer():
                         recalculate_fov = True
 
 
-
-
             # ============== draw screen =================
             if recalculate_fov:
                 self.redraw = True
@@ -892,16 +964,17 @@ class Viewer():
                 # delete everything on screen
                 self.screen.blit(self.background, (0, 0))
                 # --- order of drawing (back to front) ---
-                #print("Dungeon:")
-                #print(Game.dungeon)
                 self.draw_dungeon()
-                #self.draw_non_monsters()
-                #self.draw_monsters()
-
 
                 self.draw_radar()
                 self.draw_panel()
                 self.draw_log()
+                ##for i in range(32):
+                ##    print("i", i, i * 32)
+                ##    self.screen.blit(self.lightfloors[i+320], (i * 32, 0))
+                ##    self.screen.blit(self.darkfloors[i+320], (i * 32, 32))
+                ##    self.screen.blit(self.lightwalls[i], (i * 32, 64))
+                ##    self.screen.blit(self.darkwalls[i], (i * 32, 96))
 
             self.redraw = False
 
@@ -928,8 +1001,9 @@ class Viewer():
 
 
             # write text below sprites
-            fps_text = "FPS: {:8.3}".format(self.clock.get_fps())
-            write(self.screen, text=fps_text, origin="bottomright", x=Viewer.width-5, y=Viewer.height-5, font_size=18, color=(200,40,40))
+            fps_text = "FPS: {:5.3}".format(self.clock.get_fps())
+            pygame.draw.rect(self.screen, (64, 255, 64), (Viewer.width - 110, Viewer.height - 20, 110,20))
+            write(self.screen, text=fps_text, origin="bottomright", x=Viewer.width-2, y=Viewer.height-2, font_size=16, bold=True, color=(0,0,0))
 
 
             # -------- next frame -------------
@@ -942,4 +1016,4 @@ class Viewer():
 
 if __name__ == '__main__':
     g = Game(tiles_x=80, tiles_y=40 )
-    Viewer(g, 1200, 800)
+    Viewer(g, 1200, 800) #, (35,35))
