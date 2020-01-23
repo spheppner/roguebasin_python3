@@ -648,7 +648,23 @@ class Game():
 
 
 
-
+class Cursor():
+    
+    def __init__(self, x, y, grid_size):
+        self.x = x
+        self.y = y
+        self.grid_size = grid_size
+        self.create_image()
+    
+    def create_image(self):
+        self.image = pygame.surface.Surface((self.grid_size,
+                                             self.grid_size))
+        c = random.randint(100,200)
+        pygame.draw.rect(self.image, (c,c,c), (0,0,self.grid_size,
+                         self.grid_size), 2)
+        self.image.set_colorkey((0,0,0))
+        self.image.convert_alpha()
+        
 
 class Viewer():
     width = 0   # screen x resolution in pixel
@@ -696,6 +712,7 @@ class Viewer():
         #test = make_text("@")
 
         self.create_tiles()
+        self.cursor = Cursor(0,0, self.grid_size[0])
         self.run()
 
     def make_background(self):
@@ -955,6 +972,8 @@ class Viewer():
         #exittime = 0
         old_z = 999 # old z position of player
         show_range = False
+        animation = 0
+        
         while running:
             
             self.game.check_player()
@@ -962,6 +981,10 @@ class Viewer():
                 running = False
             milliseconds = self.clock.tick(self.fps)  #
             seconds = milliseconds / 1000
+            # --- redraw screen if animation has ended ----
+            if animation > self.playtime and animation < (self.playtime + seconds):
+                self.redraw = True 
+                
             self.playtime += seconds
             # --- check if the player has changed the dungeon level
             if old_z != self.game.player.z:
@@ -969,7 +992,31 @@ class Viewer():
             else:
                 recalculate_fov = False
             old_z = self.game.player.z
-
+            # ---------animation -------
+            if animation > self.playtime:
+                # --- draw laser beam -----
+                c = (0,0,random.randint(10,250))
+                w = random.randint(1,4)
+                startpoints = [(0,0),
+                         (self.grid_size[0],0),
+                         (0,self.grid_size[1]),
+                         (self.grid_size[0], self.grid_size[1])]
+                for x,y in startpoints:
+                    pygame.draw.line(self.screen, c, 
+                        (self.pcx+x,self.pcy+y), 
+                        (self.pcx+self.grid_size[0]//2 +lasertarget[0] * self.grid_size[0],
+                         self.pcy+self.grid_size[1]//2 +lasertarget[1] * self.grid_size[1]),
+                         w)
+                
+                pygame.display.flip()
+                self.screen.blit(self.background, (0, 0))
+                # --- order of drawing (back to front) ---
+                self.draw_dungeon()
+                self.draw_radar()
+                self.draw_panel()
+                self.draw_log()
+                continue
+            #self.oldscreen = self.screen
             # -------- events ------
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -978,7 +1025,21 @@ class Viewer():
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         running = False
-                    # ---- -simple movement with cursor keys -------
+                    # ---- move the game cursor with wasd ----
+                    if event.key == pygame.K_a:
+                        self.cursor.x -= 1
+                    if event.key == pygame.K_d:
+                        self.cursor.x += 1
+                    if event.key == pygame.K_w:
+                        self.cursor.y -= 1
+                    if event.key == pygame.K_s:
+                        self.cursor.y += 1
+                    # ---- shoot laser beam to cursor -----
+                    if event.key == pygame.K_1:
+                        # laser = 1 
+                        lasertarget = (self.cursor.x, self.cursor.y)
+                        animation = self.playtime + 1
+                    # ---- -simple player movement with cursor keys -------
                     if event.key == pygame.K_RIGHT:
                         Game.turn += 1
                         if not self.game.checkfight(self.game.player.x+1, self.game.player.y, self.game.player.z):
@@ -1039,6 +1100,7 @@ class Viewer():
                 self.game.make_fov_map()
 
             if self.redraw:
+                self.cursor.x, self.cursor.y = 0, 0
                 # delete everything on screen
                 self.screen.blit(self.background, (0, 0))
                 # --- order of drawing (back to front) ---
@@ -1091,6 +1153,11 @@ class Viewer():
                 pygame.draw.circle(self.screen, (200,0,0),
                                    (self.pcx, self.pcy),
                                    Game.torch_radius * self.grid_size[0],1)
+            # ------ Cursor -----
+            self.cursor.create_image()
+            self.screen.blit(self.cursor.image,(
+                  self.pcx+self.cursor.x*self.grid_size[0], 
+                  self.pcy+self.cursor.y*self.grid_size[1]))
             # -------- next frame -------------
             pygame.display.flip()
         # -----------------------------------------------------
