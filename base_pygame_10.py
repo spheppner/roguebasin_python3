@@ -302,7 +302,9 @@ class Game():
               "#":"wall tile",
               ".":"floor tile",
               ">":"stair down",
-              "<":"stair up"}
+              "<":"stair up",
+              "W": "wolf",
+              "S": "snake"}
 
     tiles_x = 0
     tiles_y = 0
@@ -310,12 +312,16 @@ class Game():
     log = [] # message log
     game_over = False
     turn = 1
+    cursor_x = 0
+    cursor_y = 0
 
     def __init__(self, tiles_x=80, tiles_y=40):
-        Game.tiles_x = tiles_x  # width of the level in tiles
-        Game.tiles_y = tiles_y  # height of the level in tiles, top row is 0, second row is 1 etc.
+        Game.tiles_x = tiles_x  # max. width of the level in tiles
+        Game.tiles_y = tiles_y  # max. height of the level in tiles, top row is 0, second row is 1 etc.
         #self.checked = set()   # like a list, but without duplicates. for fov calculation
         self.player = Player(x=1,y=1,z=0)
+        Game.cursor_x = self.player.x
+        Game.cursor_y = self.player.y
         #Monster(2,2,0)
         Wolf(2,2,0)
         Snake(3,3,0)
@@ -650,18 +656,15 @@ class Game():
 
 class Cursor():
     
-    def __init__(self, x, y, grid_size):
-        self.x = x
-        self.y = y
-        self.grid_size = grid_size
+    def __init__(self):
         self.create_image()
     
     def create_image(self):
-        self.image = pygame.surface.Surface((self.grid_size,
-                                             self.grid_size))
+        self.image = pygame.surface.Surface((Viewer.grid_size[0],
+                                             Viewer.grid_size[1]))
         c = random.randint(100,200)
-        pygame.draw.rect(self.image, (c,c,c), (0,0,self.grid_size,
-                         self.grid_size), 2)
+        pygame.draw.rect(self.image, (c,c,c), (0,0,Viewer.grid_size[0],
+                         Viewer.grid_size[1]), 3)
         self.image.set_colorkey((0,0,0))
         self.image.convert_alpha()
         
@@ -671,16 +674,17 @@ class Viewer():
     height = 0  # screen y resolution in pixel
     panel_width = 200
     log_height = 50
-
+    gird_size = (32,32)
 
     def __init__(self, game, width=640, height=400, grid_size = (32,32), fps=60, ):
         """Initialize pygame, window, background, font,...
            default arguments """
         self.game = game
-        self.grid_size = grid_size
-        pygame.init()
-        Viewer.width = width  # make global readable
+        self.fps = fps
+        Viewer.grid_size = grid_size # make global readable
+        Viewer.width = width
         Viewer.height = height
+        pygame.init()
         # player center in pixel
         self.pcx = (width - Viewer.panel_width) // 2  # set player in the middle of the screen
         self.pcy = (height - Viewer.log_height) // 2
@@ -688,7 +692,7 @@ class Viewer():
         self.logscreen_fontsize = 10
         self.screen = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
         self.clock = pygame.time.Clock()
-        self.fps = fps
+
         self.playtime = 0.0
         # ------ surfaces for radar, panel and log ----
         # all surfaces are black by default
@@ -712,8 +716,26 @@ class Viewer():
         #test = make_text("@")
 
         self.create_tiles()
-        self.cursor = Cursor(0,0, self.grid_size[0])
+        self.cursor = Cursor()
         self.run()
+
+    def move_cursor(self, dx=0, dy=0):
+        """moves the cursor dx, dy tiles away from the current position"""
+        target_x, target_y = self.game.player.x + Game.cursor_x + dx, self.game.player.y + Game.cursor_y + dy
+        # check if the target tile is inside the current level dimensions
+        level_width = len(Game.dungeon[self.game.player.z][0])
+        level_height = len(Game.dungeon[self.game.player.z])
+        print("level dimension in tiles:", level_width, level_height, Game.cursor_x, Game.cursor_y, dx, dy)
+        if target_x < 0 or target_y < 0 or target_x >= level_width or target_y >= level_height:
+            return # cursor can not move outside of the current level
+        # check if the target tile is outside the current game window
+        x = self.pcx + (Game.cursor_x + dx) * self.gird_size[0]
+        y = self.pcy + (Game.cursor_y + dy) * self.grid_size[1]
+        if x < 0 or y < 0 or x > (self.width - self.panel_width) or y > (self.height - self.log_height):
+            return # cursor can not move outside of the game window
+        # ---- finally, move the cursor ---
+        Game.cursor_x += dx
+        Game.cursor_y += dy
 
     def make_background(self):
         """scans the subfolder 'data' for .jpg files, randomly selects
@@ -927,6 +949,7 @@ class Viewer():
         # fill panelscreen with color
         self.panelscreen.fill((64, 128, 64))
         # write stuff in the panel
+        # -y5------------
         write(self.panelscreen, text="dungeon: {}".format(self.game.player.z), x=5, y=5, color=(255, 255, 255))
         #cheering = ["go, Hero, go!",
         #            "come on, man!",
@@ -936,11 +959,34 @@ class Viewer():
         # - hitpoint bar in red, starting left
         pygame.draw.rect(self.panelscreen, (200, 0, 0),
                          (0, 35, self.game.player.hitpoints * Viewer.panel_width / self.game.player.hitpoints_max, 28))
+        # -y35--------------------
         write(self.panelscreen, text="hp: {}/{}".format(
                self.game.player.hitpoints, self.game.player.hitpoints_max), x=5, y=35,
                color=(255,255,255), font_size=24)
+        # -y65 ----------------------
         write(self.panelscreen, text="turn: {}".format(
                Game.turn), x=5, y=65, color=(255,255,255), font_size=24)
+        # --- write cursor information into panel ---
+        # - y95 ------
+
+        tilex, tiley = self.game.player.x + Game.cursor_x, self.game.player.y + Game.cursor_y
+        t = Game.dungeon[self.game.player.z][tiley][tilex]
+        write(self.panelscreen, text="x: {}, y: {}".format(tilex, tiley), x=5, y=95, color=(255,255,255), font_size=16)
+        # tile information
+        # - y115
+        write(self.panelscreen, text=Game.legend[t.char] if t.explored else "not yet explored" , x=5, y=115, color=(255,255,255), font_size=16)
+        # objects on top of that tile ?
+        here = []
+        for o in Game.objects.values():
+            #print("object:",o)
+            if o.z == self.game.player.z and o.x == tilex and o.y == tiley and o.hitpoints >0:
+                here.append(o)
+        #print(here)
+        for dy, thing in enumerate(here):
+            # -y135 + 20*dy
+            write(self.panelscreen, text=Game.legend[thing.char], x=5, y=135+20*dy, color=(255,255,255), font_size=16)
+
+
 
 
         # blit panelscreen
@@ -981,7 +1027,7 @@ class Viewer():
                 running = False
             milliseconds = self.clock.tick(self.fps)  #
             seconds = milliseconds / 1000
-            # --- redraw screen if animation has ended ----
+            # --- redraw whole screen if animation has ended ----
             if animation > self.playtime and animation < (self.playtime + seconds):
                 self.redraw = True 
                 
@@ -997,10 +1043,11 @@ class Viewer():
                 # --- draw laser beam -----
                 c = (0,0,random.randint(10,250))
                 w = random.randint(1,4)
-                startpoints = [(0,0),
-                         (self.grid_size[0],0),
-                         (0,self.grid_size[1]),
-                         (self.grid_size[0], self.grid_size[1])]
+                d = 8 # distance from corner of grid toward center for laser start points
+                startpoints = [(d,d),
+                         (self.grid_size[0]-d,d),
+                         (d,self.grid_size[1]-d),
+                         (self.grid_size[0]-d, self.grid_size[1]-d)]
                 for x,y in startpoints:
                     pygame.draw.line(self.screen, c, 
                         (self.pcx+x,self.pcy+y), 
@@ -1027,17 +1074,21 @@ class Viewer():
                         running = False
                     # ---- move the game cursor with wasd ----
                     if event.key == pygame.K_a:
-                        self.cursor.x -= 1
+                        self.move_cursor(-1,0)
+                        #Game.cursor_x -= 1
                     if event.key == pygame.K_d:
-                        self.cursor.x += 1
+                        self.move_cursor(1,0)
+                        #Game.cursor_x += 1
                     if event.key == pygame.K_w:
-                        self.cursor.y -= 1
+                        self.move_cursor(0,-1)
+                        #Game.cursor_y -= 1
                     if event.key == pygame.K_s:
-                        self.cursor.y += 1
+                        self.move_cursor(0,1)
+                        #Game.cursor_y += 1
                     # ---- shoot laser beam to cursor -----
                     if event.key == pygame.K_1:
                         # laser = 1 
-                        lasertarget = (self.cursor.x, self.cursor.y)
+                        lasertarget = (Game.cursor_x, Game.cursor_y)
                         animation = self.playtime + 1
                     # ---- -simple player movement with cursor keys -------
                     if event.key == pygame.K_RIGHT:
@@ -1100,14 +1151,14 @@ class Viewer():
                 self.game.make_fov_map()
 
             if self.redraw:
-                self.cursor.x, self.cursor.y = 0, 0
+                Game.cursor_x, Game.cursor_y = 0, 0
                 # delete everything on screen
                 self.screen.blit(self.background, (0, 0))
                 # --- order of drawing (back to front) ---
                 self.draw_dungeon()
 
                 self.draw_radar()
-                self.draw_panel()
+                #self.draw_panel()
                 self.draw_log()
                 ##for i in range(32):
                 ##    print("i", i, i * 32)
@@ -1115,6 +1166,9 @@ class Viewer():
                 ##    self.screen.blit(self.darkfloors[i+320], (i * 32, 32))
                 ##    self.screen.blit(self.lightwalls[i], (i * 32, 64))
                 ##    self.screen.blit(self.darkwalls[i], (i * 32, 96))
+            #elif Game.cursor_x != 0 or Game.cursor_y != 0:
+            #    self.draw_panel()
+            self.draw_panel() # always draw panel
 
             self.redraw = False
 
@@ -1156,8 +1210,8 @@ class Viewer():
             # ------ Cursor -----
             self.cursor.create_image()
             self.screen.blit(self.cursor.image,(
-                  self.pcx+self.cursor.x*self.grid_size[0], 
-                  self.pcy+self.cursor.y*self.grid_size[1]))
+                  self.pcx+Game.cursor_x*self.grid_size[0],
+                  self.pcy+Game.cursor_y*self.grid_size[1]))
             # -------- next frame -------------
             pygame.display.flip()
         # -----------------------------------------------------
@@ -1168,4 +1222,4 @@ class Viewer():
 
 if __name__ == '__main__':
     g = Game(tiles_x=80, tiles_y=40 )
-    Viewer(g, 1200, 800) #, (35,35))
+    Viewer(g, width=1200, height=800, grid_size=(32,32)) #, (35,35))
