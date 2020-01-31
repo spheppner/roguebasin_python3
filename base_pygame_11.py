@@ -471,6 +471,11 @@ class Game():
                 continue
             Stair(x, y, z, char=">")
             num_stairs += 1
+        # -------------create monsters in rooms ------------------
+        #print("rooms", rooms)
+        for r in rooms:
+            if random.random() < 0.66:
+                Wolf(random.randint(r.x1+1, r.x2-1), random.randint(r.y1+1, r.y2-1), z)
 
     def ascend(self):
         """go up one dungeon level (or leave the game if already at level 0)"""
@@ -524,6 +529,7 @@ class Game():
             for y in range(rect.y1 + 1, rect.y2):
                 # replace the tile at this position with an floor tile
                 Game.dungeon[z][y][x] = Tile(".")  # replace whatever tile that was there before with a floor
+
 
     def create_h_tunnel(self, x1, x2, y, z=0):
         """create an horizontal tunnel in dungeon level z (filled with floor tiles)"""
