@@ -355,7 +355,8 @@ class Game():
             self.strike(b, a)
 
     def strike(self, a, b):
-        print("{} strikes at {}".format(a, b))
+        #print("{} strikes at {}".format(a, b))
+        Game.log.append("{} strikes at {}".format(a.__class__.__name__, b.__class__.__name__))
 
     def check_player(self):
         if self.player.hitpoints <= 0:
@@ -671,7 +672,7 @@ class Viewer():
         self.pcx = (width - Viewer.panel_width) // 2  # set player in the middle of the screen
         self.pcy = (height - Viewer.log_height) // 2
         self.radarblipsize = 4  # pixel
-        self.logscreen_fontsize = 10
+        self.logscreen_fontsize = 15
         self.screen = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
         self.clock = pygame.time.Clock()
 
@@ -985,10 +986,15 @@ class Viewer():
         # write the log lines, from bottom (last log line) to top.
         for i in range(-1, -25, -1):  # start, stop, step
             try:
-                text = Game.log[i]
+                text = "{}: {}".format(len(Game.log)+i, Game.log[i])
+                c = (0,0,0) if (len(Game.log)+i) % 2 == 0 else (87,65,0)
             except:
                 continue
-            textsf, (w, h) = make_text(text, font_size=self.logscreen_fontsize)
+            # ungerade und gerade Zeilennummern sollen verschiedenen
+            # farben haben
+
+            textsf, (w, h) = make_text(text, font_color=c,
+                                font_size=self.logscreen_fontsize)
             self.logscreen.blit(textsf, (5, self.log_height + i * h))
         # ---- blit logscreen ------
         self.screen.blit(self.logscreen, (0, Viewer.height - self.log_height))
@@ -1141,7 +1147,7 @@ class Viewer():
 
                 self.draw_radar()
                 # self.draw_panel()
-                self.draw_log()
+            self.draw_log()
                 ##for i in range(32):
                 ##    print("i", i, i * 32)
                 ##    self.screen.blit(self.lightfloors[i+320], (i * 32, 0))
