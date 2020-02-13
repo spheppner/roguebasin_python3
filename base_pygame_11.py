@@ -287,6 +287,18 @@ class Snake(Monster):
         self.image_name = "snake"
 
 
+class Yeti(Monster):
+
+    def _overwrite(self):
+        self.char = "Y"
+        self.hitpoints = 20
+        self.attack = (8, 7)
+        self.defense = (3, 3)
+        self.damage = (8, 4)
+        self.natural_weapons = ["yetihit()"]
+        self.image_name = "yeti"
+
+
 class Player(Monster):
 
     def _overwrite(self):
@@ -308,7 +320,8 @@ class Game():
               ">": "stair down",
               "<": "stair up",
               "W": "wolf",
-              "S": "snake"}
+              "S": "snake",
+			  "Y": "yeti"}
 
     tiles_x = 0
     tiles_y = 0
@@ -331,6 +344,7 @@ class Game():
         # Monster(2,2,0)
         Wolf(2, 2, 0)
         Snake(3, 3, 0)
+        Yeti(4, 4, 0)
         self.log.append("Welcome to the first dungeon level (level 0)!")
         self.log.append("Use cursor keys to move around")
         self.load_level(0, "level001.txt", "data")
@@ -740,6 +754,9 @@ class Viewer():
         self.images["snake-attack"] = pygame.image.load(os.path.join("data", "snake-attack.png")).convert_alpha()
         self.images["snake-defend"] = pygame.image.load(os.path.join("data", "snake-defend.png")).convert_alpha()
         self.images["snake-idle"] = pygame.image.load(os.path.join("data", "snake-idle.png")).convert_alpha()
+        self.images["yeti-attack"] = pygame.image.load(os.path.join("data", "yeti-attack.png")).convert_alpha()
+        self.images["yeti-defend"] = pygame.image.load(os.path.join("data", "yeti-defend.png")).convert_alpha()
+        self.images["yeti-idle"] = pygame.image.load(os.path.join("data", "yeti-idle.png")).convert_alpha()
 
 
     def move_cursor(self, dx=0, dy=0):
@@ -825,6 +842,7 @@ class Viewer():
         self.player_tile = make_text("@", font_color=self.game.player.color, grid_size=self.grid_size)[0]
         self.floor_tile_dark = make_text(".", font_color=(50, 50, 150), grid_size=self.grid_size)[0]
         self.floor_tile_light = make_text(".", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
+        self.yeti_tile = make_text("Y", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
         ##self.floor_tile_dark = self.darkfloors[4*32+0]
         ##self.floor_tile_light = self.lightfloors[4*32+0]
         self.wall_tile_dark = make_text("#", font_color=(0, 0, 100), grid_size=self.grid_size)[0]
@@ -845,7 +863,8 @@ class Viewer():
                        ">": self.stair_down_tile,
                        "M": self.monster_tile,
                        "W": self.wolf_tile,
-                       "S": self.snake_tile}
+                       "S": self.snake_tile,
+                       "Y": self.yeti_tile}
 
     def tile_blit(self, surface, x_pos, y_pos):
         """correctly blits a surface at tile-position x,y, so that the player is always centered at pcx, pcy"""
