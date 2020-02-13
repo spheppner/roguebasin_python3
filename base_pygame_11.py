@@ -284,6 +284,7 @@ class Snake(Monster):
         self.defense = (3, 3)
         self.damage = (3, 4)
         self.natural_weapons = ["SnakeBite()"]
+        self.image_name = "snake"
 
 
 class Player(Monster):
@@ -343,6 +344,7 @@ class Game():
 
     def checkfight(self, x, y, z):
         """wir gehen davon aus dass nur der player schaut (checkt) ob er in ein Monster läuft"""
+        Game.foe_image = None
         for o in Game.objects.values():
             if o == self.player:
                 continue
@@ -353,6 +355,8 @@ class Game():
             if o.x == x and o.y == y and o.z == z:
                 self.fight(self.player, o)
                 return True
+
+
 
     def fight(self, a, b):
         self.strike(a, b)
@@ -733,6 +737,9 @@ class Viewer():
         self.images["direwolf-attack"] = pygame.image.load(os.path.join("data", "direwolf-attack.png")).convert_alpha()
         self.images["direwolf-defend"] = pygame.image.load(os.path.join("data", "direwolf-defend.png")).convert_alpha()
         self.images["direwolf-idle"] = pygame.image.load(os.path.join("data", "direwolf-idle.png")).convert_alpha()
+        self.images["snake-attack"] = pygame.image.load(os.path.join("data", "snake-attack.png")).convert_alpha()
+        self.images["snake-defend"] = pygame.image.load(os.path.join("data", "snake-defend.png")).convert_alpha()
+        self.images["snake-idle"] = pygame.image.load(os.path.join("data", "snake-idle.png")).convert_alpha()
 
 
     def move_cursor(self, dx=0, dy=0):
@@ -1128,17 +1135,21 @@ class Viewer():
                             # TODO: weitermachen
                     if event.key == pygame.K_LEFT:
                         Game.turn += 1
-                        self.game.player.move(-1, 0)
-                        recalculate_fov = True
+                        if not self.game.checkfight(self.game.player.x - 1, self.game.player.y, self.game.player.z):
+                            self.game.player.move(-1, 0)
+                            recalculate_fov = True
                     if event.key == pygame.K_UP:
                         Game.turn += 1
-                        self.game.player.move(0, -1)
-                        recalculate_fov = True
+                        if not self.game.checkfight(self.game.player.x, self.game.player.y-1, self.game.player.z):
+                            self.game.player.move(0, -1)
+                            recalculate_fov = True
                     if event.key == pygame.K_DOWN:
                         Game.turn += 1
-                        self.game.player.move(0, 1)
-                        recalculate_fov = True
+                        if not self.game.checkfight(self.game.player.x, self.game.player.y+1, self.game.player.z):
+                            self.game.player.move(0, 1)
+                            recalculate_fov = True
                     if event.key == pygame.K_SPACE:
+                        # TODO checkfight -> foeimage = None? 
                         # wait a turn
                         Game.turn += 1
                         self.redraw = True
