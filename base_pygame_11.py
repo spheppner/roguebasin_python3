@@ -194,6 +194,7 @@ class Object():
         self.x = x
         self.y = y
         self.z = z
+        self.image_name = None
         self.char = char
         self.color = color
         self.hitpoints = 1  # objects with 0 or less hitpoints will be deleted
@@ -271,6 +272,7 @@ class Wolf(Monster):
         self.defense = (2, 4)
         self.agility = 0.4
         self.natural_weapons = ["WolfBite()"]
+        self.image_name="direwolf"
 
 
 class Snake(Monster):
@@ -292,6 +294,7 @@ class Player(Monster):
         self.hitpoints = 100
         self.hitpoints_max = 100
         self.items = {}
+        self.image_name = "arch-mage"
 
 
 class Game():
@@ -314,6 +317,8 @@ class Game():
     turn = 1
     cursor_x = 0
     cursor_y = 0
+    friend_image = "arch-mage-idle"
+    foe_image = None
 
     def __init__(self, tiles_x=80, tiles_y=40):
         Game.tiles_x = tiles_x  # max. width of the level in tiles
@@ -353,10 +358,21 @@ class Game():
         self.strike(a, b)
         if b.hitpoints > 0:
             self.strike(b, a)
+        # images
+        if a==self.player:
+            Game.friend_image = "arch-mage-attack"
+            if b.image_name is not None:
+                Game.foe_image = b.image_name + "-attack"
+        elif b == self.player:
+            Game.friend_image = "arch-mage-defend"
+            if a.image is not None:
+                Game.foe_image = a.image_name + "-attack"
 
     def strike(self, a, b):
         #print("{} strikes at {}".format(a, b))
         Game.log.append("{} strikes at {}".format(a.__class__.__name__, b.__class__.__name__))
+
+
 
     def check_player(self):
         if self.player.hitpoints <= 0:
@@ -704,10 +720,20 @@ class Viewer():
         # ------ create bitmaps for player and dungeon tiles ----
         # print("fontsize dim values")
         # test = make_text("@")
-
+        self.images = {}
+        self.load_images()
         self.create_tiles()
         self.cursor = Cursor()
         self.run()
+
+    def load_images(self):
+        self.images["arch-mage-attack"] = pygame.image.load(os.path.join("data", "arch-mage-attack.png")).convert_alpha()
+        self.images["arch-mage-defend"] = pygame.image.load(os.path.join("data", "arch-mage-defend.png")).convert_alpha()
+        self.images["arch-mage-idle"] = pygame.image.load(os.path.join("data", "arch-mage-idle.png")).convert_alpha()
+        self.images["direwolf-attack"] = pygame.image.load(os.path.join("data", "direwolf-attack.png")).convert_alpha()
+        self.images["direwolf-defend"] = pygame.image.load(os.path.join("data", "direwolf-defend.png")).convert_alpha()
+        self.images["direwolf-idle"] = pygame.image.load(os.path.join("data", "direwolf-idle.png")).convert_alpha()
+
 
     def move_cursor(self, dx=0, dy=0):
         """moves the cursor dx, dy tiles away from the current position"""
@@ -983,6 +1009,12 @@ class Viewer():
                   font_size=16)
 
         # blit panelscreen
+        # ----- friend and foe ----
+        self.panelscreen.blit(self.images[Game.friend_image], (10,400))
+        if Game.foe_image is not None:
+            self.panelscreen.blit(self.images[Game.foe_image], (100,400))
+
+
         self.screen.blit(self.panelscreen, (Viewer.width - self.panel_width, self.panel_width))
 
     def draw_log(self):
