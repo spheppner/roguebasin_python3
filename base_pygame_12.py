@@ -951,7 +951,8 @@ class Viewer():
         self.lightfloors = []
         self.darkfeats = []
         self.lightfeats = []
-
+        player_img = pygame.image.load(os.path.join("data", "player.png"))
+        player_img.convert_alpha()
         walls_img = pygame.image.load(os.path.join("data", "wall.png"))  # spritesheet 32x32 pixel
         floors_img = pygame.image.load(os.path.join("data", "floor.png"))  # spritesheet 32x32 pixel
         walls_dark_img = walls_img.copy()
@@ -985,14 +986,18 @@ class Viewer():
         # x1,y1, x2,y2: 0,225, 32 , 256
         self.lightwalls.append(pygame.Surface.subsurface(walls_img, (0,255,32,32)))
         self.darkwalls.append(pygame.Surface.subsurface(walls_dark_img, (0,255,32,32)))
-
+        self.lightfloors.append(pygame.Surface.subsurface(floors_img,(10*32,3*32,32,32) ))
+        self.darkfloors.append( pygame.Surface.subsurface(floors_dark_img,(10*32,3*32,32,32) ))
 
         self.wolf_tile = make_text("W", font_color=(100, 100, 100), grid_size=self.grid_size)[0]
         self.snake_tile = make_text("S", font_color=(0, 200, 0), grid_size=self.grid_size)[0]
         self.monster_tile = make_text("M", font_color=(139, 105, 20), grid_size=self.grid_size)[0]
-        self.player_tile = make_text("@", font_color=self.game.player.color, grid_size=self.grid_size)[0]
-        self.floor_tile_dark = make_text(".", font_color=(50, 50, 150), grid_size=self.grid_size)[0]
-        self.floor_tile_light = make_text(".", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
+        ##self.player_tile = make_text("@", font_color=self.game.player.color, grid_size=self.grid_size)[0]
+        self.player_tile = pygame.Surface.subsurface(player_img, (153,1087,27,33) )
+        ##self.floor_tile_dark = make_text(".", font_color=(50, 50, 150), grid_size=self.grid_size)[0]
+        ##self.floor_tile_light = make_text(".", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
+        self.floor_tile_dark = self.darkfloors[0]
+        self.floor_tile_light = self.lightfloors[0]
         self.yeti_tile = make_text("Y", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
         ##self.floor_tile_dark = self.darkfloors[4*32+0]
         ##self.floor_tile_light = self.lightfloors[4*32+0]
