@@ -959,27 +959,33 @@ class Viewer():
         feats_img = pygame.image.load(os.path.join("data", "feat.png"))
         feats_dark_img = feats_img.copy()
         # blit a darker picture over the original to darken
-        darken_percent = .25
+        darken_percent = .50
         for (original, copy) in [(walls_img, walls_dark_img), (floors_img, floors_dark_img),
                                  (feats_img, feats_dark_img)]:
             dark = pygame.surface.Surface(original.get_size()).convert_alpha()
             dark.fill((0, 0, 0, darken_percent * 255))
             copy.blit(dark, (0, 0))  # blit dark surface over original
         # get a list of floor tiles and another list of wall tiles, each with an index
-        for (original, targetlist, width, height) in ((walls_img, self.lightwalls, 32, 32),
-                                                      (walls_dark_img, self.darkwalls, 32, 32),
-                                                      (floors_img, self.lightfloors, 32, 32),
-                                                      (floors_dark_img, self.darkfloors, 32, 32),
-                                                      (feats_img, self.lightfeats, 29, 32),
-                                                      (feats_dark_img, self.darkfeats, 29, 32)):
-            size_x, size_y = original.get_size()
-            # print(original, "size:", size_x, size_y)
-            for y in range(0, size_y + 1, height):
-                for x in range(0, size_x + 1, width):
-                    img = pygame.surface.Surface((width, height))
-                    img.blit(original, (0, 0), (x, y, width, height))
-                    img.convert()
-                    targetlist.append(img)
+        #for (original, targetlist, width, height) in ((walls_img, self.lightwalls, 32, 32),
+        #                                              (walls_dark_img, self.darkwalls, 32, 32),
+        #                                              (floors_img, self.lightfloors, 32, 32),
+        #                                              (floors_dark_img, self.darkfloors, 32, 32),
+        #                                              (feats_img, self.lightfeats, 29, 32),
+        #                                              (feats_dark_img, self.darkfeats, 29, 32)):
+        #    size_x, size_y = original.get_size()
+        #    # print(original, "size:", size_x, size_y)
+        #    for y in range(0, size_y + 1, height):
+        #        for x in range(0, size_x + 1, width):
+        #            img = pygame.surface.Surface((width, height))
+        #            img.blit(original, (0, 0), (x, y, width, height))
+        #            img.convert()
+        #            targetlist.append(img)
+
+        # ---- add single subimage to darkwalls and lightwalls---
+        # x1,y1, x2,y2: 0,225, 32 , 256
+        self.lightwalls.append(pygame.Surface.subsurface(walls_img, (0,255,32,32)))
+        self.darkwalls.append(pygame.Surface.subsurface(walls_dark_img, (0,255,32,32)))
+
 
         self.wolf_tile = make_text("W", font_color=(100, 100, 100), grid_size=self.grid_size)[0]
         self.snake_tile = make_text("S", font_color=(0, 200, 0), grid_size=self.grid_size)[0]
@@ -990,10 +996,10 @@ class Viewer():
         self.yeti_tile = make_text("Y", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
         ##self.floor_tile_dark = self.darkfloors[4*32+0]
         ##self.floor_tile_light = self.lightfloors[4*32+0]
-        self.wall_tile_dark = make_text("#", font_color=(0, 0, 100), grid_size=self.grid_size)[0]
-        ##self.wall_tile_dark = self.darkwalls[3*32+0]   # 0
-        self.wall_tile_light = make_text("#", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
-        ##self.wall_tile_light = self.lightwalls[3*32+0]  # 0
+        #self.wall_tile_dark = make_text("#", font_color=(0, 0, 100), grid_size=self.grid_size)[0]
+        self.wall_tile_dark = self.darkwalls[0]   # 0
+        #self.wall_tile_light = make_text("#", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
+        self.wall_tile_light = self.lightwalls[0]  # 0
         self.unknown_tile = make_text("?", font_color=(14, 14, 14), grid_size=self.grid_size)[0]
         self.stair_up_tile = make_text("<", font_color=(128, 0, 128), grid_size=self.grid_size)[0]
         ##self.stair_up_tile = self.lightfeats[5*35+2]
@@ -1085,7 +1091,7 @@ class Viewer():
         for o in Game.objects.values():
             if o.z == z and o.y == y and o.x == x:  # only care if in the correct dungeon level
                 # -- only care for Monster class instances or instances that are a child of the Monster class --
-                if o.is_member("Monster"):
+                if o.is_member("Monster") and o.hitpoints > 0:
                     c = self.legend[o.char]
                     # self.screen.blit(c, (o.x * self.grid_size[0], o.y * self.grid_size[1]))
                     if o == self.game.player:
