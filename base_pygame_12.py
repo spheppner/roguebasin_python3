@@ -20,6 +20,12 @@ import random
 
 import os
 
+
+
+#TODO: cursor soll keine schleimspur ziehen
+#TODO: cursor darf nicht in unerforschte zellen gehen
+#TODO: game legende vereinheitlichen von viewer und game
+
 class NaturalWeapon():
 
     def __init__(self,):
@@ -134,7 +140,20 @@ def roll(dice, bonus=0):
     print("==================")
     print("=total:     {}".format(total+bonus))
     return total+bonus
-        
+
+def randomizer(list_of_chances=[1]):
+    """gives back an integer depending on chance.
+       e.g. randomizer((.75, 0.15, 0.05, 0.05)) gives in 75% 0, in 15% 1, and in 5% 2 or 3"""
+    total = sum(list_of_chances)
+    v = random.random() * total # a value between 0 and total
+    edge = 0
+    for i, c in enumerate(list_of_chances):
+        edge += c
+        if v <= edge:
+            return i
+    else:
+        raise SystemError("problem with list of chances:", list_of_chances)
+
 
 def make_text(text="@", font_color=(255, 0, 255), font_size=48, font_name="mono", bold=True, grid_size=None):
     """returns pygame surface with text and x, y dimensions in pixel
@@ -275,8 +294,14 @@ class Tile():
        block_movement means blocking the movement of Monster/Player, like a wall
        block_sight means blocking the field of view
     """
+    #number = 0  # "globale" class variable
 
     def __init__(self, char, block_movement=None, block_sight=None, explored=False):
+        #self.number = Tile.number
+        #Tile.number += 1 # each tile instance has a unique number
+        # generate a number that is mostly 0,but very seldom 1 and very rarely 2 or 3
+        # see randomizer
+        self.decoration = randomizer((.75, 0.15, 0.05, 0.05))
         self.char = char
         self.block_movement = block_movement
         self.block_sight = block_sight
@@ -292,6 +317,8 @@ class Tile():
             self.block_movement = False
             self.block_sight = False
             # self.i = random.randint(1,10)
+
+
 
 
 class Object():
@@ -313,6 +340,7 @@ class Object():
         self.char = char
         self.color = color
         self.hitpoints = 1  # objects with 0 or less hitpoints will be deleted
+        self.look_direction = 0  # 0 -> looks to left, 1 -> looks to right
         # --- make attributes out of all named arguments. like Object(hp=33) -> self.hp = 33
         for key, arg in kwargs.items():
             setattr(self, key, arg)
@@ -329,13 +357,6 @@ class Object():
 
     def is_member(self, name):
         """returns True if the instance is a member of the 'name' class or a child of it"""
-        # if self.__class__.__name__ == name:
-        #    return True
-        # for c in self.__class__.__bases__:
-        #    if c.__name__ == name:
-        #        return True
-        ## it's not a member of 'name'
-        # return False
         class_names = [c.__name__ for c in self.__class__.mro()]  # if c.__name__ != "object"]
         if name in class_names:
             return True
@@ -356,12 +377,14 @@ class Monster(Object):
     def _overwrite(self):
         self.char = "M"
         if self.color is None:
-            # yello as default color
             self.color = (255, 255, 0)
-        # if "hitpoints_max" not in kwargs:
-        #    self.hitpoints_max = self.hitpoints
+
 
     def move(self, dx, dy, dz=0):
+        if dx > 0:
+            self.look_direction = 1
+        elif dx < 0:
+            self.look_direction = 0
         try:
             target = Game.dungeon[self.z + dz][self.y + dy][self.x + dx]
         except:
@@ -383,7 +406,7 @@ class Wolf(Monster):
         self.char = "W"
         self.hitpoints = 30
         self.attack = (2, 6)
-        self.defense = (2, 6)
+        self.defense = (2, 5)
         self.damage = (2, 4)
         self.agility = 0.4
         self.natural_weapons = [WolfBite()]
@@ -413,6 +436,16 @@ class Yeti(Monster):
         self.natural_weapons = [YetiSnowBall(),YetiSlap()]
         self.image_name = "yeti"
 
+class Dragon(Monster):
+
+    def _overwrite(self):
+        self.char = "D"
+        self.hitpoints = 50
+        self.attack = (6, 3)
+        self.defense = (6, 3)
+        self.damage = (5, 3)
+        self.natural_weapons = [DragonBite(),DragonClaw(),DragonTail(),FireBreath()]
+        self.image_name = "dragon"
 
 class Player(Monster):
 
@@ -440,7 +473,8 @@ class Game():
               "<": "stair up",
               "W": "wolf",
               "S": "snake",
-              "Y": "yeti"}
+              "Y": "yeti",
+              "D": "dragon"}
 
     tiles_x = 0
     tiles_y = 0
@@ -464,6 +498,7 @@ class Game():
         Wolf(2, 2, 0)
         Snake(3, 3, 0)
         Yeti(4, 4, 0)
+        Dragon(5,5,0)
         self.log.append("Welcome to the first dungeon level (level 0)!")
         self.log.append("Use cursor keys to move around")
         self.load_level(0, "level001.txt", "data")
@@ -486,6 +521,11 @@ class Game():
             if not o.is_member("Monster"):
                 continue
             if o.x == x and o.y == y and o.z == z:
+                # monster should now look toward player
+                if o.x > self.player.x:
+                    o.look_direction = 0
+                elif o.x < self.player.x:
+                    o.look_direction = 1
                 self.fight(self.player, o)
                 return True
 
@@ -886,10 +926,12 @@ class Viewer():
         self.images = {}
         self.load_images()
         self.create_tiles()
+        self.wall_and_floor_theme()
         self.cursor = Cursor()
         self.run()
 
     def load_images(self):
+        """single images. char looks to the right by default?"""
         self.images["arch-mage-attack"] = pygame.image.load(os.path.join("data", "arch-mage-attack.png")).convert_alpha()
         self.images["arch-mage-defend"] = pygame.image.load(os.path.join("data", "arch-mage-defend.png")).convert_alpha()
         self.images["arch-mage-idle"] = pygame.image.load(os.path.join("data", "arch-mage-idle.png")).convert_alpha()
@@ -902,6 +944,10 @@ class Viewer():
         self.images["yeti-attack"] = pygame.image.load(os.path.join("data", "yeti-attack.png")).convert_alpha()
         self.images["yeti-defend"] = pygame.image.load(os.path.join("data", "yeti-defend.png")).convert_alpha()
         self.images["yeti-idle"] = pygame.image.load(os.path.join("data", "yeti-idle.png")).convert_alpha()
+        self.images["dragon-attack"] = pygame.image.load(os.path.join("data", "dragon-attack.png")).convert_alpha()
+        self.images["dragon-defend"] = pygame.image.load(os.path.join("data", "dragon-defend.png")).convert_alpha()
+        self.images["dragon-idle"] = pygame.image.load(os.path.join("data", "dragon-idle.png")).convert_alpha()
+
 
 
     def move_cursor(self, dx=0, dy=0):
@@ -921,6 +967,7 @@ class Viewer():
         # ---- finally, move the cursor ---
         Game.cursor_x += dx
         Game.cursor_y += dy
+        #self.screen.blit(self.background, (0, 0))
 
     def make_background(self):
         """scans the subfolder 'data' for .jpg files, randomly selects
@@ -944,24 +991,21 @@ class Viewer():
         self.background.convert()
 
     def create_tiles(self):
-        """create tiles for blitting"""
-        self.darkwalls = []
-        self.lightwalls = []
-        self.darkfloors = []
-        self.lightfloors = []
+        """load tilemap images and create tiles for blitting"""
+
         self.darkfeats = []
         self.lightfeats = []
-        player_img = pygame.image.load(os.path.join("data", "player.png"))
+        player_img = pygame.image.load(os.path.join("data", "player.png")) # spritesheed, mostly 32x32, figures looking to the left
         player_img.convert_alpha()
-        walls_img = pygame.image.load(os.path.join("data", "wall.png"))  # spritesheet 32x32 pixel
-        floors_img = pygame.image.load(os.path.join("data", "floor.png"))  # spritesheet 32x32 pixel
-        walls_dark_img = walls_img.copy()
-        floors_dark_img = floors_img.copy()
+        self.walls_img = pygame.image.load(os.path.join("data", "wall.png"))  # spritesheet 32x32 pixel
+        self.floors_img = pygame.image.load(os.path.join("data", "floor.png"))  # spritesheet 32x32 pixel
+        self.walls_dark_img = self.walls_img.copy()
+        self.floors_dark_img = self.floors_img.copy()
         feats_img = pygame.image.load(os.path.join("data", "feat.png"))
         feats_dark_img = feats_img.copy()
         # blit a darker picture over the original to darken
         darken_percent = .50
-        for (original, copy) in [(walls_img, walls_dark_img), (floors_img, floors_dark_img),
+        for (original, copy) in [(self.walls_img, self.walls_dark_img), (self.floors_img, self.floors_dark_img),
                                  (feats_img, feats_dark_img)]:
             dark = pygame.surface.Surface(original.get_size()).convert_alpha()
             dark.fill((0, 0, 0, darken_percent * 255))
@@ -982,45 +1026,88 @@ class Viewer():
         #            img.convert()
         #            targetlist.append(img)
 
-        # ---- add single subimage to darkwalls and lightwalls---
-        # x1,y1, x2,y2: 0,225, 32 , 256
-        self.lightwalls.append(pygame.Surface.subsurface(walls_img, (0,255,32,32)))
-        self.darkwalls.append(pygame.Surface.subsurface(walls_dark_img, (0,255,32,32)))
-        self.lightfloors.append(pygame.Surface.subsurface(floors_img,(10*32,3*32,32,32) ))
-        self.darkfloors.append( pygame.Surface.subsurface(floors_dark_img,(10*32,3*32,32,32) ))
 
-        self.wolf_tile = make_text("W", font_color=(100, 100, 100), grid_size=self.grid_size)[0]
-        self.snake_tile = make_text("S", font_color=(0, 200, 0), grid_size=self.grid_size)[0]
+        # ---- tiles for Monsters are tuples. first item looks to the left, second item looks to the right
+        #self.wolf_tile = make_text("W", font_color=(100, 100, 100), grid_size=self.grid_size)[0]
+        self.wolf_tile = pygame.Surface.subsurface( player_img, (823,607,32,32) )
+        self.wolf_tile_r = pygame.transform.flip(self.wolf_tile, True, False)
+        self.wolf_tiles = (self.wolf_tile, self.wolf_tile_r)
+        ##self.snake_tile = make_text("S", font_color=(0, 200, 0), grid_size=self.grid_size)[0]
+         #                                                        x y breit höhe
+        self.snake_tile = pygame.Surface.subsurface( player_img, (256,894,32,28) )
+        self.snake_tile_r = pygame.transform.flip(self.snake_tile, True, False)
+        self.snake_tiles = (self.snake_tile, self.snake_tile_r)
+        # dragon
+        self.dragon_tile = pygame.Surface.subsurface( player_img, (747,559,33,49) )
+        self.dragon_tile_r = pygame.transform.flip(self.dragon_tile, True, False)
+        self.dragon_tiles = (self.dragon_tile, self.dragon_tile_r)
         self.monster_tile = make_text("M", font_color=(139, 105, 20), grid_size=self.grid_size)[0]
+        self.monster_tiles = (self.monster_tile, self.monster_tile)
         ##self.player_tile = make_text("@", font_color=self.game.player.color, grid_size=self.grid_size)[0]
         self.player_tile = pygame.Surface.subsurface(player_img, (153,1087,27,33) )
+        self.player_tile_r = pygame.transform.flip(self.player_tile, True, False)
+        self.player_tiles = (self.player_tile, self.player_tile_r)
         ##self.floor_tile_dark = make_text(".", font_color=(50, 50, 150), grid_size=self.grid_size)[0]
         ##self.floor_tile_light = make_text(".", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
-        self.floor_tile_dark = self.darkfloors[0]
-        self.floor_tile_light = self.lightfloors[0]
-        self.yeti_tile = make_text("Y", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
+        #self.floor_tile_dark = self.darkfloors[0]
+        #self.floor_tile_light = self.lightfloors[0]
+        #self.yeti_tile = make_text("Y", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
+        self.yeti_tile = pygame.Surface.subsurface( player_img, (193,1279,32,32) )
+        self.yeti_tile_r = pygame.transform.flip(self.yeti_tile, True, False)
+        self.yeti_tiles = (self.yeti_tile, self.yeti_tile_r)
         ##self.floor_tile_dark = self.darkfloors[4*32+0]
         ##self.floor_tile_light = self.lightfloors[4*32+0]
         #self.wall_tile_dark = make_text("#", font_color=(0, 0, 100), grid_size=self.grid_size)[0]
-        self.wall_tile_dark = self.darkwalls[0]   # 0
+        #self.wall_tile_dark = self.darkwalls[0]   # 0
         #self.wall_tile_light = make_text("#", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
-        self.wall_tile_light = self.lightwalls[0]  # 0
-        self.unknown_tile = make_text("?", font_color=(14, 14, 14), grid_size=self.grid_size)[0]
+        #self.wall_tile_light = self.lightwalls[0]  # 0
+        self.unknown_tile = make_text(" ", font_color=(14, 14, 14), grid_size=self.grid_size)[0]
         self.stair_up_tile = make_text("<", font_color=(128, 0, 128), grid_size=self.grid_size)[0]
         ##self.stair_up_tile = self.lightfeats[5*35+2]
         self.stair_down_tile = make_text(">", font_color=(128, 255, 128), grid_size=self.grid_size)[0]
-        self.legend = {"@": self.player_tile,
-                       ".": self.floor_tile_light,
-                       "#": self.wall_tile_light,
-                       ":": self.floor_tile_dark,
-                       "X": self.wall_tile_dark,
-                       "?": self.unknown_tile,
+        self.legend = {"@": self.player_tiles,
+                       " ": self.unknown_tile,
                        "<": self.stair_up_tile,
                        ">": self.stair_down_tile,
-                       "M": self.monster_tile,
-                       "W": self.wolf_tile,
-                       "S": self.snake_tile,
-                       "Y": self.yeti_tile}
+                       "M": self.monster_tiles,
+                       "W": self.wolf_tiles,
+                       "S": self.snake_tiles,
+                       "Y": self.yeti_tiles,
+                       "D": self.dragon_tiles,
+                       } # rest of legend in wall_and_floor_theme
+
+
+    def  wall_and_floor_theme(self):
+        """select a set of floor/walltiles, depending on level number (z)"""
+        # floors: x(topleft), y(topleft), how many elements
+        floors = [(25, 225, 4),
+                  (55, 257, 4),
+                  (55, 288, 4)]
+         # walls: x(topleft), y(topleft), how many elements
+        walls = [(0,0,4),
+                 (0,65,8),
+                 (0,225,4),
+                 (127,255,4)]
+        # ---- add single subimages to darkwalls and lightwalls---
+        # x1,y1, x2,y2: 0,225, 32 , 256
+        # see class floor, attribute decoration for probability. first img comes most often
+        self.darkwalls = []
+        self.lightwalls = []
+        for (x, y) in ((0, 255), (32, 255), (64, 255), (96, 255)):
+            self.lightwalls.append(pygame.Surface.subsurface(self.walls_img, (x, y, 32, 32)))
+            self.darkwalls.append(pygame.Surface.subsurface(self.walls_dark_img, (x, y, 32, 32)))
+        self.darkfloors = []
+        self.lightfloors = []
+        for (x, y) in ((0, 352), (32, 352), (64, 352), (96, 352)):
+            self.lightfloors.append(pygame.Surface.subsurface(self.floors_img, (x, y, 32, 32)))
+            self.darkfloors.append(pygame.Surface.subsurface(self.floors_dark_img, (x, y, 32, 32)))
+        # now set the legend for this level!
+        self.legend["."] = self.lightfloors
+        self.legend["#"] = self.lightwalls
+        self.legend[":"] = self.darkfloors,
+        self.legend["X"] = self.darkwalls,
+
+
 
     def tile_blit(self, surface, x_pos, y_pos):
         """correctly blits a surface at tile-position x,y, so that the player is always centered at pcx, pcy"""
@@ -1032,6 +1119,7 @@ class Viewer():
         if (x + self.grid_size[0]) < 0 or (y + self.grid_size[1]) < 0:
             return
         # blit
+
         self.screen.blit(surface, (x, y))
 
     def draw_dungeon(self):
@@ -1046,11 +1134,11 @@ class Viewer():
                     # -- only blit (dark) if tile is explored. only draw explored Items (stairs)
                     if map_tile.explored:
                         if map_tile.char == "#":
-                            c = self.wall_tile_dark
+                            c = self.darkwalls[map_tile.decoration]
                             # print(map_tile.i)
                             # c = self.darkwalls[map_tile.i]
                         elif map_tile.char == ".":
-                            c = self.floor_tile_dark
+                            c = self.darkfloors[map_tile.decoration]
                         else:
                             raise SystemError("strange tile in map:", c)
                     else:
@@ -1073,12 +1161,20 @@ class Viewer():
                 # --- blit dungeon tile ----
                 # TODO: option to skip blitting dungeon tile if Monster or object is here
                 # print(self.game.player.z, map_tile.char)
-                c = self.legend[map_tile.char]  # light tiles
+                c = self.legend[map_tile.char][map_tile.decoration]  # light tiles
                 # self.screen.blit(c, (x * self.grid_size[0], y * self.grid_size[1]))
                 # self.screen.blit(c, (x * self.grid_size[0], y * self.grid_size[1]))
                 self.tile_blit(c, x, y)  # first, blit the dungeon tile
                 self.draw_non_monsters(x, y)  # then, blit any items (stairs) on it
-                self.draw_monsters(x, y)  # then, blit any monsters
+                #self.draw_monsters(x, y)  # then, blit any monsters
+                #----- alles nochmal, damit monster größer sein können als tiles ohne abgeschnitten zu werden
+                
+        for y, line in enumerate(Game.dungeon[z]):
+            for x, map_tile in enumerate(line):
+                if  Game.fov_map[y][x]:
+                    self.draw_monsters(x, y)  # then, blit any monsters
+
+                
 
     def draw_non_monsters(self, x, y):
         z = self.game.player.z
@@ -1086,6 +1182,7 @@ class Viewer():
             if o.z == z and o.y == y and o.x == x:  # only care if in the correct dungeon level
                 # -- only care if NOT: Monster class instances or instances that are a child of the Monster class
                 if not o.is_member("Monster"):
+
                     c = self.legend[o.char]
                     o.explored = True
                     # self.screen.blit(c, (m.x * self.grid_size[0], m.y * self.grid_size[1]))
@@ -1097,7 +1194,7 @@ class Viewer():
             if o.z == z and o.y == y and o.x == x:  # only care if in the correct dungeon level
                 # -- only care for Monster class instances or instances that are a child of the Monster class --
                 if o.is_member("Monster") and o.hitpoints > 0:
-                    c = self.legend[o.char]
+                    c = self.legend[o.char][o.look_direction] # looks left or right
                     # self.screen.blit(c, (o.x * self.grid_size[0], o.y * self.grid_size[1]))
                     if o == self.game.player:
                         self.screen.blit(c, (self.pcx, self.pcy))  # blit the player always in middle of screen
@@ -1230,7 +1327,7 @@ class Viewer():
         old_z = 999  # old z position of player
         show_range = False
         animation = 0
-
+        reset_cursor = True
         while running:
 
             self.game.check_player()
@@ -1286,15 +1383,26 @@ class Viewer():
                     # ---- move the game cursor with wasd ----
                     if event.key == pygame.K_a:
                         self.move_cursor(-1, 0)
+                        self.redraw = True
+                        reset_cursor = False
                         # Game.cursor_x -= 1
                     if event.key == pygame.K_d:
                         self.move_cursor(1, 0)
+                        self.redraw = True
+                        reset_cursor = False
+                       
                         # Game.cursor_x += 1
                     if event.key == pygame.K_w:
                         self.move_cursor(0, -1)
+                        self.redraw = True
+                        reset_cursor = False
+                       
                         # Game.cursor_y -= 1
                     if event.key == pygame.K_s:
                         self.move_cursor(0, 1)
+                        self.redraw = True
+                        reset_cursor = False
+                       
                         # Game.cursor_y += 1
                     # ---- shoot laser beam to cursor -----
                     if event.key == pygame.K_1:
@@ -1304,25 +1412,29 @@ class Viewer():
                     # ---- -simple player movement with cursor keys -------
                     if event.key == pygame.K_RIGHT:
                         Game.turn += 1
+                        recalculate_fov = True
                         if not self.game.checkfight(self.game.player.x + 1, self.game.player.y, self.game.player.z):
                             self.game.player.move(1, 0)
-                            recalculate_fov = True
+
                             # TODO: weitermachen
                     if event.key == pygame.K_LEFT:
                         Game.turn += 1
+                        recalculate_fov = True
                         if not self.game.checkfight(self.game.player.x - 1, self.game.player.y, self.game.player.z):
                             self.game.player.move(-1, 0)
-                            recalculate_fov = True
+
                     if event.key == pygame.K_UP:
                         Game.turn += 1
+                        recalculate_fov = True
                         if not self.game.checkfight(self.game.player.x, self.game.player.y-1, self.game.player.z):
                             self.game.player.move(0, -1)
-                            recalculate_fov = True
+                            #recalculate_fov = True
                     if event.key == pygame.K_DOWN:
                         Game.turn += 1
+                        recalculate_fov = True
                         if not self.game.checkfight(self.game.player.x, self.game.player.y+1, self.game.player.z):
                             self.game.player.move(0, 1)
-                            recalculate_fov = True
+                            #recalculate_fov = True
                     if event.key == pygame.K_SPACE:
                         # TODO checkfight -> foeimage = None? 
                         # wait a turn
@@ -1363,7 +1475,9 @@ class Viewer():
                 self.game.make_fov_map()
 
             if self.redraw:
-                Game.cursor_x, Game.cursor_y = 0, 0
+                if reset_cursor:
+                    Game.cursor_x, Game.cursor_y = 0, 0
+                reset_cursor = True
                 # delete everything on screen
                 self.screen.blit(self.background, (0, 0))
                 # --- order of drawing (back to front) ---
