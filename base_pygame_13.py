@@ -21,9 +21,9 @@ import random
 import os
 
 
-# TODO: cursor soll keine schleimspur ziehen
+
 # TODO: cursor darf nicht in unerforschte zellen gehen
-# TODO: game legende vereinheitlichen von viewer und game
+# TODO diagonal movement for player ? or not allowing diagonal movement for monsters...
 
 class NaturalWeapon():
 
@@ -119,24 +119,53 @@ class FireBreath(NaturalWeapon):
         self.defense_bonus = -4
 
 
-def roll(dice, bonus=0):
+def roll(dice, bonus=0, reroll=True):
+    """simulate a dice throw, and adding a bonus
+       reroll means that if the highest number is rolled,
+       one is substracted from the score and
+       another roll is added, until a not-hightest number is rolled.
+       e.g. 1D6 throws a 6, and re-rolls a 2 -> (6-1)+2= 7"""
+    # TODO format-micro-language for aligning the numbers better
     rolls = dice[0]
     sides = dice[1]
     total = 0
-    print("-----------------------")
-    print("rolling {}d{} + bonus {}".format(rolls, sides, bonus))
-    print("-----------------------")
-    for d in range(rolls):
+    print("------------------------")
+    print("rolling {}{}{} + bonus {}".format(rolls, "D" if reroll else "d", sides, bonus))
+    print("------------------------")
+    i = 0
+    verb = "rolls   "
+    #for d in range(rolls):
+    while True:
+        i += 1
+        if i > rolls:
+            break
         value = random.randint(1, sides)
-        print("rolling die #{}:....{} ".format(d, value))
-        total += value
-    print("==================")
+
+        if reroll and value == sides:
+            total += value - 1
+            print("die #{} {} {}  ∑: {} (count as {} and rolls again)".format(i, verb, value, total, value-1 ))
+
+            verb = "re-rolls"
+            i -= 1
+            continue
+        else:
+            total += value
+            print("die #{} {} {}  ∑: {}".format(i, verb, value, total))
+            verb = "rolls   "
+
+    print("=========================")
     print("=result:    {}".format(total))
     print("+bonus:     {}".format(bonus))
-    print("==================")
+    print("=========================")
     print("=total:     {}".format(total + bonus))
     return total + bonus
 
+
+def minmax(value, lower_limit=-1, upper_limit=1):
+    """constrains a value inside two limits"""
+    value = max(lower_limit, value)
+    value = min(upper_limit, value)
+    return value
 
 def randomizer(list_of_chances=[1]):
     """gives back an integer depending on chance.
@@ -305,7 +334,7 @@ class Tile():
         self.block_sight = block_sight
         self.explored = explored
         # graphic_index is a random number to choose one of several graphical tiles
-        self.graphic_index = random.randint(1, 4)
+        #self.graphic_index = random.randint(1, 4)
         # --- some common tiles ---
         if char == "#":  # wall
             self.block_movement = True
@@ -332,6 +361,7 @@ class Object():
         self.x = x
         self.y = y
         self.z = z
+        self.hint = None # longer description and hint for panel
         self.image_name = None
         self.char = char
         self.color = color
@@ -347,6 +377,10 @@ class Object():
             self.stay_visible_once_explored = False
         # --- child classes can do stuff in the _overwrite() method  without needing their own __init__ method
         self._overwrite()
+        # --- update legend ---
+        if self.char not in Game.legend:
+            Game.legend[self.char] = self.__class__.__name__
+
 
     def _overwrite(self):
         pass
@@ -358,6 +392,21 @@ class Object():
             return True
         return False
 
+class Gold(Object):
+    """a heap of gold"""
+
+    def _overwrite(self):
+        self.color = (200,200,0)
+        self.char="*"
+        self.value = random.randint(1,100)
+
+class Shop(Object):
+    """a shop to trade items"""
+    def _overwrite(self):
+        self.color= ( 200,200,0)
+        self.stay_visible_once_explored = True
+        self.char = "$"
+        self.hint = "press Space to buy hp"
 
 class Stair(Object):
     """a stair, going upwards < or downwards >"""
@@ -365,15 +414,41 @@ class Stair(Object):
     def _overwrite(self):
         self.color = (128, 0, 128)  # violet
         self.stay_visible_once_explored = True
+        self.hint = "press PgUp/PgDown to change level"
 
 
 class Monster(Object):
     """a (moving?) dungeon Monster, like the player, a boss, a NPC..."""
 
     def _overwrite(self):
+        self.aggro = 3
         self.char = "M"
         if self.color is None:
             self.color = (255, 255, 0)
+
+    def ai(self, player):
+        """returns dx, dy toward the player (if distance < aggro) or randomly"""
+        distance = ((self.x - player.x)**2 + (self.y-player.y)**2)**0.5
+        if distance < self.aggro:
+            dx = player.x - self.x
+            dy = player.y - self.y
+            dx = minmax(dx, -1, 1)
+            dy = minmax(dy, -1, 1)
+        else:
+            dx = random.choice((-1,0,1))
+            dy = random.choice((-1,0,1))
+        try:
+            target = Game.dungeon[self.z][self.y + dy][self.x + dx]
+        except:
+            print("monster trying illegally to leave dungeon")
+            return 0, 0
+            ##raise SystemError("out of dungeon?", self.x, self.y, self.z)
+        if target.block_movement:
+            print("monster trying to move into a wall")
+            return 0, 0
+        print("dx dy", self.__class__.__name__, dx, dy)
+        return dx, dy
+
 
     def move(self, dx, dy, dz=0):
         if dx > 0:
@@ -399,6 +474,7 @@ class Wolf(Monster):
 
     def _overwrite(self):
         self.char = "W"
+        self.aggro = 5
         self.hitpoints = 30
         self.attack = (2, 6)
         self.defense = (2, 5)
@@ -412,6 +488,7 @@ class Snake(Monster):
 
     def _overwrite(self):
         self.char = "S"
+        self.aggro = 2
         self.hitpoints = 20
         self.attack = (2, 4)
         self.defense = (3, 3)
@@ -424,6 +501,7 @@ class Yeti(Monster):
 
     def _overwrite(self):
         self.char = "Y"
+        self.aggro = 4
         self.hitpoints = 20
         self.attack = (8, 2)
         self.defense = (4, 3)
@@ -436,6 +514,7 @@ class Dragon(Monster):
 
     def _overwrite(self):
         self.char = "D"
+        self.aggro = 6
         self.hitpoints = 50
         self.attack = (6, 3)
         self.defense = (6, 3)
@@ -456,6 +535,7 @@ class Player(Monster):
         self.damage = (4, 5)
         self.natural_weapons = [Fist(), Kick()]
         self.items = {}
+        self.gold = 100
         self.image_name = "arch-mage"
 
 
@@ -463,26 +543,22 @@ class Game():
     dungeon = []  # list of list of list. 3D map representation, using text chars. z,y,x ! z=0: first level. z=1: second level etc
     fov_map = []  # field of vie map, only for current level!
     objects = {}  # container for all Object instances in this dungeon
+    #legend = {} # fills itself because of class Object's __init__ method
     legend = {"@": "player",
               "#": "wall tile",
               ".": "floor tile",
               ">": "stair down",
               "<": "stair up",
-              "W": "wolf",
-              "S": "snake",
-              "Y": "yeti",
-              "D": "dragon"}
-
+              }
     tiles_x = 0
     tiles_y = 0
     torch_radius = 10
     log = []  # message log
     game_over = False
-    turn = 1
     cursor_x = 0
     cursor_y = 0
-    friend_image = "arch-mage-idle"
-    foe_image = None
+    #friend_image = "arch-mage-idle"
+    #foe_image = None
 
     def __init__(self, tiles_x=80, tiles_y=40):
         Game.tiles_x = tiles_x  # max. width of the level in tiles
@@ -496,20 +572,29 @@ class Game():
         Snake(3, 3, 0)
         Yeti(4, 4, 0)
         Dragon(5, 5, 0)
+        Shop(7,1,0)
         self.log.append("Welcome to the first dungeon level (level 0)!")
         self.log.append("Use cursor keys to move around")
         self.load_level(0, "level001.txt", "data")
         #self.load_level(1, "level002.txt", "data")
         #self.load_level(2, "level003.txt", "data")
-        # TODO join create_empty_dungeon_level mit create_rooms_tunnels 
+        # TODO join create_empty_dungeon_level mit create_rooms_tunnels
         self.create_empty_dungeon_level(tiles_x, tiles_y, filled=True, z=1)  # dungoen is full of walls,
         # carve out some rooms and tunnels in this new dungeon level
         self.create_rooms_and_tunnels(z=1)  # carve out some random rooms and tunnels
         # append empty dungeon level
+        self.turn = 1
+
+    def new_turn(self):
+        self.turn += 1
+        for o in Game.objects.values():
+            if o.z == self.player.z and o != self.player and o.hitpoints > 0 and o.is_member("Monster"):
+                self.move_monster(o)
+
 
     def checkfight(self, x, y, z):
         """wir gehen davon aus dass nur der player schaut (checkt) ob er in ein Monster läuft"""
-        Game.foe_image = None
+        #Game.foe_image = None
         for o in Game.objects.values():
             if o == self.player:
                 continue
@@ -517,28 +602,60 @@ class Game():
                 continue
             if not o.is_member("Monster"):
                 continue
-            if o.x == x and o.y == y and o.z == z:
-                # monster should now look toward player
+            if o.z == z:
                 if o.x > self.player.x:
                     o.look_direction = 0
                 elif o.x < self.player.x:
                     o.look_direction = 1
-                self.fight(self.player, o)
-                return True
+            #if o.x == x and o.y == y and o.z == z:
+                if o.x == x and o.y == y:
+                    # monster should now look toward player
+                    #if o.x > self.player.x:
+                    #    o.look_direction = 0
+                    #elif o.x < self.player.x:
+                    #    o.look_direction = 1
+                    self.fight(self.player, o)
+                    return True
+        return False
+
+    def move_monster(self, m):
+        """moves a monster randomly, but not into another monster (or wall etc.).
+           starts a fight with player if necessary"""
+        dx, dy = m.ai(self.player)
+        # ai checked already that the move is legal (inside dungeon and not blocked by wall)
+        # now only needed to check i running in another monster or into the player
+        for o in Game.objects.values():
+            if o.z != self.player.z:
+                continue
+            if o.hitpoints < 1:
+                continue
+            if not o.is_member("Monster"):
+                continue
+            if o.x == m.x + dx and o.y == m.y + dy:
+                dx, dy = 0, 0
+                if o == self.player:
+                    self.fight(m, self.player)
+                break
+        m.x += dx
+        m.y += dy
+
+
+
+
 
     def fight(self, a, b):
         self.strike(a, b)
         if b.hitpoints > 0:
             self.strike(b, a)
-        # images
-        if a == self.player:
-            Game.friend_image = "arch-mage-attack"
-            if b.image_name is not None:
-                Game.foe_image = b.image_name + "-attack"
-        elif b == self.player:
-            Game.friend_image = "arch-mage-defend"
-            if a.image is not None:
-                Game.foe_image = a.image_name + "-attack"
+        # big images
+        #if a == self.player:
+        #    Game.friend_image = "arch-mage-attack"
+        #    if b.image_name is not None:
+        #        Game.foe_image = b.image_name + "-attack"
+        #elif b == self.player:
+        #    Game.friend_image = "arch-mage-defend"
+        #    if a.image is not None:
+        #        Game.foe_image = a.image_name + "-attack"
 
     def strike(self, a, b):
         # print("{} strikes at {}".format(a, b))
@@ -593,6 +710,9 @@ class Game():
                 if char == "<" or char == ">":
                     row.append(Tile("."))
                     Stair(x, y, z, char)
+                if char == "$":
+                    row.append(Tile("."))
+                    Shop(x,y,z,char)
             level.append(row)
         try:
             Game.dungeon[z] = level
@@ -876,7 +996,7 @@ class Viewer():
     height = 0  # screen y resolution in pixel
     panel_width = 200
     log_height = 100
-    gird_size = (32, 32)
+    grid_size = (32, 32)
 
     def __init__(self, game, width=640, height=400, grid_size=(32, 32), fps=60, ):
         """Initialize pygame, window, background, font,...
@@ -940,7 +1060,6 @@ class Viewer():
         #self.images["yeti-attack"] = pygame.image.load(os.path.join("data", "yeti-attack.png")).convert_alpha()
         #self.images["yeti-defend"] = pygame.image.load(os.path.join("data", "yeti-defend.png")).convert_alpha()
         #self.images["yeti-idle"] = pygame.image.load(os.path.join("data", "yeti-idle.png")).convert_alpha()
-        # TODO: dragon (big) images instead of yeti images
         #self.images["dragon-attack"] = pygame.image.load(os.path.join("data", "yeti-attack.png")).convert_alpha()
         #self.images["dragon-defend"] = pygame.image.load(os.path.join("data", "yeti-defend.png")).convert_alpha()
         #self.images["dragon-idle"] = pygame.image.load(os.path.join("data", "yeti-idle.png")).convert_alpha()
@@ -955,7 +1074,7 @@ class Viewer():
         if target_x < 0 or target_y < 0 or target_x >= level_width or target_y >= level_height:
             return  # cursor can not move outside of the current level
         # check if the target tile is outside the current game window
-        x = self.pcx + (Game.cursor_x + dx) * self.gird_size[0]
+        x = self.pcx + (Game.cursor_x + dx) * self.grid_size[0]
         y = self.pcy + (Game.cursor_y + dy) * self.grid_size[1]
         if x < 0 or y < 0 or x > (self.width - self.panel_width) or y > (self.height - self.log_height):
             return  # cursor can not move outside of the game window
@@ -1063,21 +1182,30 @@ class Viewer():
         ### stair tiles: index 0 -> light tile, index 1 -> dark tile
         self.stair_up_tiles =  ( pygame.Surface.subsurface(feats_img, (32,192,32,32)),
                                  pygame.Surface.subsurface(feats_dark_img, (32, 192, 32, 32)) )
-        self.stair_up_tile_dark = pygame.Surface.subsurface(feats_dark_img, (32,192,32,32))
+        #self.stair_up_tile_dark = pygame.Surface.subsurface(feats_dark_img, (32,192,32,32))
         ##self.stair_down_tile = make_text(">", font_color=(128, 255, 128), grid_size=self.grid_size)[0]
         ### stair tiles: index 0 -> light tile, index 1 -> dark tile
         self.stair_down_tiles = ( pygame.Surface.subsurface(feats_img, (0,192,32,32)) ,
                                   pygame.Surface.subsurface(feats_dark_img, (0, 192, 32, 32)) )
         #self.stair_down_tile_dark = pygame.Surface.subsurface(feats_dark_img, (0,192,32,32))
+
+        self.shop_tiles = ( pygame.Surface.subsurface(feats_img,      (439, 192, 32, 32)) ,
+                            pygame.Surface.subsurface(feats_dark_img, (439, 192, 32, 32)) )
+
+
+
+
         self.legend = {"@": self.player_tiles,
                        " ": self.unknown_tile,
                        "<": self.stair_up_tiles,
                        ">": self.stair_down_tiles,
+                       "$": self.shop_tiles,
                        "M": self.monster_tiles,
                        "W": self.wolf_tiles,
                        "S": self.snake_tiles,
                        "Y": self.yeti_tiles,
                        "D": self.dragon_tiles,
+
                        }  # rest of legend in wall_and_floor_theme
 
     def wall_and_floor_theme(self):
@@ -1110,16 +1238,16 @@ class Viewer():
         self.legend[":"] = self.darkfloors,
         self.legend["X"] = self.darkwalls,
 
-    def tile_blit(self, surface, x_pos, y_pos):
+    def tile_blit(self, surface, x_pos, y_pos, corr_x=0, corr_y=0):
         """correctly blits a surface at tile-position x,y, so that the player is always centered at pcx, pcy"""
-        x = (x_pos - self.game.player.x) * self.grid_size[0] + self.pcx
-        y = (y_pos - self.game.player.y) * self.grid_size[1] + self.pcy
+        x = (x_pos - self.game.player.x) * self.grid_size[0] + self.pcx + corr_x
+        y = (y_pos - self.game.player.y) * self.grid_size[1] + self.pcy + corr_y
         # check if the tile is inside the game screen, otherwise ignore
         if (x > (Viewer.width - Viewer.panel_width)) or (y > (Viewer.height - Viewer.log_height)):
             return
         if (x + self.grid_size[0]) < 0 or (y + self.grid_size[1]) < 0:
             return
-        # blit
+
 
         self.screen.blit(surface, (x, y))
 
@@ -1151,11 +1279,11 @@ class Viewer():
                     olist = [o for o in Game.objects.values() if
                              o.explored and o.stay_visible_once_explored and o.z == z and o.y == y and o.x == x]
                     for o in olist:
-                        # TODO check if self.legend[o.char] is a list/tuple or a single surface
-                        if o.char in "<>":
-                            self.tile_blit(self.legend[o.char][1], x, y)
-                        else:
-                            self.tile_blit(self.legend[o.char], x, y)
+                        #print("blitting....", o.char)
+                        #if o.char in "<>":
+                        self.tile_blit(self.legend[o.char][1], x, y)
+                        #else:
+                        #    self.tile_blit(self.legend[o.char], x, y)
                     continue  # next tile, please
                 # ==============================================
                 # ---- we are inside the torch radius ---
@@ -1186,7 +1314,7 @@ class Viewer():
             if o.z == z and o.y == y and o.x == x:  # only care if in the correct dungeon level
                 # -- only care if NOT: Monster class instances or instances that are a child of the Monster class
                 if not o.is_member("Monster"):
-                    if o.char in "<>":
+                    if o.char in "<>$":
                         c=self.legend[o.char][0] # light tile
                     else:
                         c = self.legend[o.char]
@@ -1203,11 +1331,18 @@ class Viewer():
                 if o.is_member("Monster") and o.hitpoints > 0:
                     c = self.legend[o.char][o.look_direction]  # looks left or right
                     # self.screen.blit(c, (o.x * self.grid_size[0], o.y * self.grid_size[1]))
+                    # correction so that if monster surface != size of tile surface monster is centered on tile
+                    corr_x, corr_y = 0, 0
+                    if c.get_size() != self.grid_size:
+                        corr_x = (self.grid_size[0] - c.get_size()[0])//2
+                        corr_y = (self.grid_size[1] - c.get_size()[1])//2
+
+
                     if o == self.game.player:
-                        self.screen.blit(c, (self.pcx, self.pcy))  # blit the player always in middle of screen
+                        self.screen.blit(c, (self.pcx+corr_x, self.pcy+corr_y))  # blit the player always in middle of screen
                     else:
                         o.explored = True
-                        self.tile_blit(c, o.x, o.y)
+                        self.tile_blit(c, o.x, o.y, corr_x, corr_y)
                     break  # one monster per tile is enough
 
     def draw_radar(self):
@@ -1269,14 +1404,15 @@ class Viewer():
             self.game.player.hitpoints, self.game.player.hitpoints_max), x=5, y=35,
               color=(255, 255, 255), font_size=24)
         # -y65 ----------------------
-        write(self.panelscreen, text="turn: {}".format(
-            Game.turn), x=5, y=65, color=(255, 255, 255), font_size=24)
+        write(self.panelscreen, text="Gold: {}".format(
+              self.game.player.gold), x=5, y=65, color=(255, 255, 0), font_size=24)
+
         # --- write cursor information into panel ---
         # - y95 ------
 
         tilex, tiley = self.game.player.x + Game.cursor_x, self.game.player.y + Game.cursor_y
         t = Game.dungeon[self.game.player.z][tiley][tilex]
-        write(self.panelscreen, text="x: {}, y: {}".format(tilex, tiley), x=5, y=95, color=(255, 255, 255),
+        write(self.panelscreen, text="x:{} y:{} turn:{}".format(tilex, tiley, self.game.turn), x=5, y=95, color=(255, 255, 255),
               font_size=16)
         # tile information
         # - y115
@@ -1284,15 +1420,26 @@ class Viewer():
               color=(255, 255, 255), font_size=16)
         # objects on top of that tile ?
         here = []
+        hints = []
         for o in Game.objects.values():
             # print("object:",o)
             if o.z == self.game.player.z and o.x == tilex and o.y == tiley and o.hitpoints > 0:
                 here.append(o)
+                if o.hint is not None:
+                    hints.append(o.hint)
         # print(here)
+        dy = 0
         for dy, thing in enumerate(here):
             # -y135 + 20*dy
+            # TODO: blit text in variable fontsize/panel width with word wrap
             write(self.panelscreen, text=Game.legend[thing.char], x=5, y=135 + 20 * dy, color=(255, 255, 255),
                   font_size=16)
+
+        # --- print hints ----
+        y = 135 + 20 * dy + 50
+        for h in hints:
+            write(self.panelscreen, text=h, x=5, y=y, color=(0,0,0), font_size=10)
+            y += 20
 
         # blit panelscreen
         # ----- friend and foe ----
@@ -1321,6 +1468,12 @@ class Viewer():
             self.logscreen.blit(textsf, (5, self.log_height + i * h))
         # ---- blit logscreen ------
         self.screen.blit(self.logscreen, (0, Viewer.height - self.log_height))
+
+    def new_turn(self):
+        """new turn in Viewer, calls new turn in Game and updates graphics that may have changed, plays animations etc"""
+        self.game.new_turn()
+        self.redraw = True
+        #self.redraw = True
 
     def run(self):
         """The mainloop"""
@@ -1417,34 +1570,46 @@ class Viewer():
                         animation = self.playtime + 1
                     # ---- -simple player movement with cursor keys -------
                     if event.key == pygame.K_RIGHT:
-                        Game.turn += 1
+                        #Game.turn += 1
+                        self.new_turn()
                         recalculate_fov = True
                         if not self.game.checkfight(self.game.player.x + 1, self.game.player.y, self.game.player.z):
                             self.game.player.move(1, 0)
 
-                            # TODO: weitermachen
                     if event.key == pygame.K_LEFT:
-                        Game.turn += 1
+                        #Game.turn += 1
+                        self.new_turn()
                         recalculate_fov = True
                         if not self.game.checkfight(self.game.player.x - 1, self.game.player.y, self.game.player.z):
                             self.game.player.move(-1, 0)
 
                     if event.key == pygame.K_UP:
-                        Game.turn += 1
+                        #Game.turn += 1
+                        self.new_turn()
                         recalculate_fov = True
                         if not self.game.checkfight(self.game.player.x, self.game.player.y - 1, self.game.player.z):
                             self.game.player.move(0, -1)
                             # recalculate_fov = True
                     if event.key == pygame.K_DOWN:
-                        Game.turn += 1
+                        #Game.turn += 1
+                        self.new_turn()
                         recalculate_fov = True
                         if not self.game.checkfight(self.game.player.x, self.game.player.y + 1, self.game.player.z):
                             self.game.player.move(0, 1)
                             # recalculate_fov = True
                     if event.key == pygame.K_SPACE:
-                        # TODO checkfight -> foeimage = None?
-                        # wait a turn
-                        Game.turn += 1
+                        #Game.turn += 1  # wait a turn
+                        self.new_turn()
+                        # wenn auf shop buy one hp for one gold
+                        for o in Game.objects.values():
+                            if (o.z == self.game.player.z and
+                                o.x == self.game.player.x and
+                                o.y == self.game.player.y and
+                                self.game.player.gold > 0 and
+                                o.__class__.__name__=="Shop"):
+                                self.game.player.gold -= 1
+                                self.game.player.hitpoints += 1
+
                         self.redraw = True
                     if event.key == pygame.K_PAGEUP:
                         Game.turn += 1
@@ -1540,9 +1705,10 @@ class Viewer():
                                    Game.torch_radius * self.grid_size[0], 1)
             # ------ Cursor -----
             self.cursor.create_image()
-            self.screen.blit(self.cursor.image, (
-                self.pcx + Game.cursor_x * self.grid_size[0],
-                self.pcy + Game.cursor_y * self.grid_size[1]))
+            if Game.cursor_y != 0 or Game.cursor_x != 0:
+                self.screen.blit(self.cursor.image, (
+                    self.pcx + Game.cursor_x * self.grid_size[0],
+                    self.pcy + Game.cursor_y * self.grid_size[1]))
             # -------- next frame -------------
             pygame.display.flip()
         # -----------------------------------------------------
