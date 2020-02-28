@@ -120,6 +120,34 @@ class FireBreath(NaturalWeapon):
         self.defense_bonus = -4
 
 
+def megaroll(dicestring="1d6 1d20", bonus=0):
+    """roll all the dice in the dicestring and adds a bonus to the sum
+    1d6 means one 6-sided die without re-roll
+    1D6 means one 6-sided die with re-roll.
+    re-roll: 1D6 means that when hightest side (6) is rolled, 5 (=6-1) is added and he rolls again"""
+    dlist = dicestring.split(" ")
+    total = 0
+    print("calculating: ", dicestring, "+", bonus)
+    for code in dlist:
+        print("---processing", code)
+        if "d" in code:
+            #reroll = False
+            rolls = int(code.split("d")[0])
+            sides = int(code.split("d")[1])
+            total += roll((rolls, sides), bonus=0, reroll=False)
+        elif "D" in code:
+            #reroll = True
+            rolls = int(code.split("D")[0])
+            sides = int(code.split("D")[1])
+            total += roll((rolls, sides), bonus=0, reroll=True)
+        else:
+            raise SystemError("unknow dice type: {} use 1d6, 1D20 etc".format(code))
+        print("---result of", code, "is :", str(total))
+    print("adding "+str(bonus)+"=", str(total+bonus))
+    return total+bonus
+
+
+
 def roll(dice, bonus=0, reroll=True):
     """simulate a dice throw, and adding a bonus
        reroll means that if the highest number is rolled,
@@ -127,6 +155,7 @@ def roll(dice, bonus=0, reroll=True):
        another roll is added, until a not-hightest number is rolled.
        e.g. 1D6 throws a 6, and re-rolls a 2 -> (6-1)+2= 7"""
     # TODO format-micro-language for aligning the numbers better
+    #TODO: accepting string of several dice, like '2D6 3d4' where 'd' means no re-roll, 'D' means re-roll
     rolls = dice[0]
     sides = dice[1]
     total = 0
@@ -145,7 +174,6 @@ def roll(dice, bonus=0, reroll=True):
         if reroll and value == sides:
             total += value - 1
             print("die #{} {} {}  ∑: {} (count as {} and rolls again)".format(i, verb, value, total, value-1 ))
-
             verb = "re-rolls"
             i -= 1
             continue
@@ -415,7 +443,7 @@ class Stair(Object):
     def _overwrite(self):
         self.color = (128, 0, 128)  # violet
         self.stay_visible_once_explored = True
-        self.hint = "press PgUp/PgDown to change level"
+        self.hint = "press < or > to change level"
 
 
 class Monster(Object):
