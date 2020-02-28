@@ -573,8 +573,9 @@ class Game():
         Wolf(2, 2, 0)
         Snake(3, 3, 0)
         Yeti(4, 4, 0)
-        Dragon(5, 5, 0)
+        Dragon(25, 5, 0)
         Shop(7,1,0)
+        Gold(2,1,0)
         self.log.append("Welcome to the first dungeon level (level 0)!")
         self.log.append("Use cursor keys to move around")
         self.load_level(0, "level001.txt", "data")
@@ -842,15 +843,21 @@ class Game():
             if random.random() < 0.66:
                 Wolf(random.randint(r.x1 + 1, r.x2 - 1), random.randint(r.y1 + 1, r.y2 - 1), z)
 
+    def use_stairs(self):
+        """go up or done one dungeon level, depending on stair"""
+        for o in Game.objects.values():
+            if o.is_member("Stair") and o.char in "<>" and o.z == self.player.z and o.y == self.player.y and o.x == self.player.x:
+                break # all ok, found a stair
+        else:
+            Game.log.append("You must find a stair up to ascend or descend")
+            return
+        if o.char == "<":
+            self.ascend()
+        elif o.char == ">":
+            self.descend()
+
     def ascend(self):
         """go up one dungeon level (or leave the game if already at level 0)"""
-        # check if player is staying on a stair up, otherwise cancel
-        for o in Game.objects.values():
-            if o.is_member("Stair") and o.char=="<" and o.z == self.player.z and o.y == self.player.y and o.x == self.player.x:
-                break # all ok, correct stair
-        else:
-            Game.log.append("You must find a stair up to ascend")
-            return
         if self.player.z == 0:
             Game.log.append("You climb back to the surface and leave the dungeon. Good Bye!")
             print(Game.log[-1])
@@ -863,13 +870,6 @@ class Game():
 
     def descend(self):
         """go down one dungeon level. create this level if necessary """
-        # first check if staying on a stair down, otherwise return
-        for o in Game.objects.values():
-            if o.is_member("Stair") and o.char==">" and o.z == self.player.z and o.y == self.player.y and o.x == self.player.x:
-                break # all ok, correct stair
-        else:
-            Game.log.append("You must find a stair down to descend")
-            return
         Game.log.append("climbing down one level, deeper into the dungeon...")
         try:
             l = Game.dungeon[self.player.z + 1]
@@ -1523,7 +1523,7 @@ class Viewer():
         self.game.make_fov_map()
         self.redraw = True
         # exittime = 0
-        old_z = 999  # old z position of player
+
         show_range = False
         animation = 0
         reset_cursor = True
@@ -1539,12 +1539,7 @@ class Viewer():
                 self.redraw = True
 
             self.playtime += seconds
-            # --- check if the player has changed the dungeon level
-            #if old_z != self.game.player.z:
-            #    recalculate_fov = True
-            #else:
-            #    recalculate_fov = False
-            old_z = self.game.player.z
+
             # ---------animation -------
             if animation > self.playtime:
                 # --- draw laser beam -----
@@ -1609,38 +1604,39 @@ class Viewer():
                         lasertarget = (Game.cursor_x, Game.cursor_y)
                         animation = self.playtime + 1
                     # ---- -simple player movement with cursor keys -------
-                    if event.key == pygame.K_RIGHT:
+                    if event.key in ( pygame.K_RIGHT, pygame.K_KP6 ) :
                         self.new_turn()
-                        recalculate_fov = True
                         self.game.move_player(1, 0)
-                        #if not self.game.checkfight(self.game.player.x + 1, self.game.player.y, self.game.player.z):
-                        #    self.game.player.move(1, 0)
 
-                    if event.key == pygame.K_LEFT:
-                        #Game.turn += 1
+                    if event.key in ( pygame.K_LEFT, pygame.K_KP4 ):
                         self.new_turn()
-                        recalculate_fov = True
                         self.game.move_player(-1,0)
-                        #if not self.game.checkfight(self.game.player.x - 1, self.game.player.y, self.game.player.z):
-                        #    self.game.player.move(-1, 0)
 
-                    if event.key == pygame.K_UP:
-                        #Game.turn += 1
+                    if event.key in ( pygame.K_UP, pygame.K_KP8):
                         self.new_turn()
-                        recalculate_fov = True
                         self.game.move_player(0,-1)
-                        #if not self.game.checkfight(self.game.player.x, self.game.player.y - 1, self.game.player.z):
-                        #    self.game.player.move(0, -1)
-                            # recalculate_fov = True
-                    if event.key == pygame.K_DOWN:
-                        #Game.turn += 1
+
+                    if event.key in ( pygame.K_DOWN, pygame.K_KP2):
                         self.new_turn()
-                        recalculate_fov = True
                         self.game.move_player(0,1)
-                        #print("redraw after move", self.redraw)
-                        #if not self.game.checkfight(self.game.player.x, self.game.player.y + 1, self.game.player.z):
-                        #    self.game.player.move(0, 1)
-                            # recalculate_fov = True
+
+                    # --- diagonal movement ---
+                    if event.key in (pygame.K_KP7, pygame.K_HOME):
+                        self.new_turn()
+                        self.game.move_player(-1,-1)
+
+                    if event.key in (pygame.K_KP9, pygame.K_PAGEUP):
+                        self.new_turn()
+                        self.game.move_player(1,-1)
+
+                    if event.key in (pygame.K_KP1, pygame.K_END):
+                        self.new_turn()
+                        self.game.move_player(-1,1)
+
+                    if event.key in (pygame.K_KP3, pygame.K_PAGEDOWN):
+                        self.new_turn()
+                        self.game.move_player(1,1)
+
                     if event.key == pygame.K_SPACE:
                         #Game.turn += 1  # wait a turn
                         self.new_turn()
@@ -1655,14 +1651,10 @@ class Viewer():
                                 self.game.player.hitpoints += 1
 
                         self.redraw = True
-                    if event.key == pygame.K_PAGEUP:
+                    if event.key in ( pygame.K_LESS, pygame.K_GREATER) :
                         self.new_turn()
                         # go up a level
-                        self.game.ascend()
-                        self.redraw = True
-                    if event.key == pygame.K_PAGEDOWN:
-                        self.new_turn()
-                        self.game.descend()
+                        self.game.use_stairs()
                         self.redraw = True
 
                     if event.key == pygame.K_r:
@@ -1680,20 +1672,16 @@ class Viewer():
                     # --- increase torch radius ---
                     if event.key == pygame.K_PLUS:
                         Game.torch_radius += 1
-                        #recalculate_fov = True
                         self.game.make_fov_map()
                         self.redraw = True
                     # --- decrease torch radius ----
                     if event.key == pygame.K_MINUS:
                         Game.torch_radius -= 1
-                        #recalculate_fov = True
+
                         self.game.make_fov_map()
                         self.redraw = True
 
             # ============== draw screen =================
-            #if recalculate_fov:
-            #    self.redraw = True
-            #    self.game.make_fov_map()
 
             if self.redraw:
                 if reset_cursor:
@@ -1707,14 +1695,7 @@ class Viewer():
                 self.draw_radar()
                 # self.draw_panel()
             self.draw_log()
-            ##for i in range(32):
-            ##    print("i", i, i * 32)
-            ##    self.screen.blit(self.lightfloors[i+320], (i * 32, 0))
-            ##    self.screen.blit(self.darkfloors[i+320], (i * 32, 32))
-            ##    self.screen.blit(self.lightwalls[i], (i * 32, 64))
-            ##    self.screen.blit(self.darkwalls[i], (i * 32, 96))
-            # elif Game.cursor_x != 0 or Game.cursor_y != 0:
-            #    self.draw_panel()
+
             self.draw_panel()  # always draw panel
 
             self.redraw = False
@@ -1755,7 +1736,7 @@ class Viewer():
                                    Game.torch_radius * self.grid_size[0], 1)
             # ------ Cursor -----
             self.cursor.create_image()
-            if Game.cursor_y != 0 or Game.cursor_x != 0:
+            if Game.cursor_y != 0 or Game.cursor_x != 0: # only blit cursor if outside player
                 self.screen.blit(self.cursor.image, (
                     self.pcx + Game.cursor_x * self.grid_size[0],
                     self.pcy + Game.cursor_y * self.grid_size[1]))
