@@ -24,6 +24,7 @@ import os
 
 # TODO: cursor darf nicht in unerforschte zellen gehen
 # TODO diagonal movement for player ? or not allowing diagonal movement for monsters...
+# TODO monster speed > 1 tile possible ?
 
 class NaturalWeapon():
 
@@ -461,8 +462,9 @@ class Monster(Object):
             raise SystemError("out of dungeon?", self.x, self.y, self.z)
         # --- check if monsters is trying to run into a wall ---
         if target.block_movement:
-            self.hitpoints -= 1
-            Game.log.append("ouch!")  # movement is not possible
+            if self.is_member("Player"):
+                self.hitpoints -= 1
+                Game.log.append("ouch!")  # movement is not possible
             return
 
         self.x += dx
@@ -591,6 +593,26 @@ class Game():
             if o.z == self.player.z and o != self.player and o.hitpoints > 0 and o.is_member("Monster"):
                 self.move_monster(o)
 
+    def player_has_new_position(self):
+        """called after postion change of player,
+        checks if the player can pick up something or stays
+        on an interesting tile"""
+        myfloor = []
+        for o in Game.objects.values():
+            if (o.z == self.player.z and o.hitpoints > 0 and
+                not o.is_member("Monster") and
+                o.x == self.player.x and o.y == self.player.y):
+                myfloor.append(o)
+        if len(myfloor) > 0:
+            for o in myfloor:
+                if o.is_member("Gold"):
+                    Game.log.append("You found {} gold!".format(o.value))
+                    self.player.gold += o.value
+                    # kill gold from dungeon
+                    del Game.objects[o.number]
+
+
+
 
     def checkfight(self, x, y, z):
         """wir gehen davon aus dass nur der player schaut (checkt) ob er in ein Monster läuft"""
@@ -617,6 +639,12 @@ class Game():
                     self.fight(self.player, o)
                     return True
         return False
+
+    def move_player(self, dx=0, dy=0):
+        if not self.checkfight(self.player.x +dx, self.player.y + dy, self.player.z):
+            self.player.move(dx, dy)
+            self.make_fov_map()
+            self.player_has_new_position()
 
     def move_monster(self, m):
         """moves a monster randomly, but not into another monster (or wall etc.).
@@ -713,6 +741,9 @@ class Game():
                 if char == "$":
                     row.append(Tile("."))
                     Shop(x,y,z,char)
+                if char == "*":
+                    row.append(Tile("."))
+                    Gold(x,y,z, char)
             level.append(row)
         try:
             Game.dungeon[z] = level
@@ -813,6 +844,13 @@ class Game():
 
     def ascend(self):
         """go up one dungeon level (or leave the game if already at level 0)"""
+        # check if player is staying on a stair up, otherwise cancel
+        for o in Game.objects.values():
+            if o.is_member("Stair") and o.char=="<" and o.z == self.player.z and o.y == self.player.y and o.x == self.player.x:
+                break # all ok, correct stair
+        else:
+            Game.log.append("You must find a stair up to ascend")
+            return
         if self.player.z == 0:
             Game.log.append("You climb back to the surface and leave the dungeon. Good Bye!")
             print(Game.log[-1])
@@ -820,9 +858,18 @@ class Game():
         else:
             Game.log.append("climbing up one level....")
             self.player.z -= 1
+            self.make_fov_map()
+            self.player_has_new_position()
 
     def descend(self):
         """go down one dungeon level. create this level if necessary """
+        # first check if staying on a stair down, otherwise return
+        for o in Game.objects.values():
+            if o.is_member("Stair") and o.char==">" and o.z == self.player.z and o.y == self.player.y and o.x == self.player.x:
+                break # all ok, correct stair
+        else:
+            Game.log.append("You must find a stair down to descend")
+            return
         Game.log.append("climbing down one level, deeper into the dungeon...")
         try:
             l = Game.dungeon[self.player.z + 1]
@@ -832,6 +879,8 @@ class Game():
                                             z=self.player.z + 1)
             self.create_rooms_and_tunnels(z=self.player.z + 1)
         self.player.z += 1
+        self.make_fov_map()
+        self.player_has_new_position()
         # return True
 
     def create_empty_dungeon_level(self, max_x, max_y, filled=True, z=0):
@@ -1107,8 +1156,6 @@ class Viewer():
     def create_tiles(self):
         """load tilemap images and create tiles for blitting"""
 
-        self.darkfeats = []
-        self.lightfeats = []
         player_img = pygame.image.load(
             os.path.join("data", "player.png"))  # spritesheed, mostly 32x32, figures looking to the left
         player_img.convert_alpha()
@@ -1118,28 +1165,15 @@ class Viewer():
         self.floors_dark_img = self.floors_img.copy()
         feats_img = pygame.image.load(os.path.join("data", "feat.png"))
         feats_dark_img = feats_img.copy()
+        main_img = pygame.image.load(os.path.join("data", "main.png"))
+        main_dark_img = main_img.copy()
         # blit a darker picture over the original to darken
         darken_percent = .50
         for (original, copy) in [(self.walls_img, self.walls_dark_img), (self.floors_img, self.floors_dark_img),
-                                 (feats_img, feats_dark_img)]:
+                                 (feats_img, feats_dark_img), (main_img, main_dark_img)]:
             dark = pygame.surface.Surface(original.get_size()).convert_alpha()
             dark.fill((0, 0, 0, darken_percent * 255))
             copy.blit(dark, (0, 0))  # blit dark surface over original
-        # get a list of floor tiles and another list of wall tiles, each with an index
-        # for (original, targetlist, width, height) in ((walls_img, self.lightwalls, 32, 32),
-        #                                              (walls_dark_img, self.darkwalls, 32, 32),
-        #                                              (floors_img, self.lightfloors, 32, 32),
-        #                                              (floors_dark_img, self.darkfloors, 32, 32),
-        #                                              (feats_img, self.lightfeats, 29, 32),
-        #                                              (feats_dark_img, self.darkfeats, 29, 32)):
-        #    size_x, size_y = original.get_size()
-        #    # print(original, "size:", size_x, size_y)
-        #    for y in range(0, size_y + 1, height):
-        #        for x in range(0, size_x + 1, width):
-        #            img = pygame.surface.Surface((width, height))
-        #            img.blit(original, (0, 0), (x, y, width, height))
-        #            img.convert()
-        #            targetlist.append(img)
 
         # ---- tiles for Monsters are tuples. first item looks to the left, second item looks to the right
         # self.wolf_tile = make_text("W", font_color=(100, 100, 100), grid_size=self.grid_size)[0]
@@ -1191,6 +1225,9 @@ class Viewer():
 
         self.shop_tiles = ( pygame.Surface.subsurface(feats_img,      (439, 192, 32, 32)) ,
                             pygame.Surface.subsurface(feats_dark_img, (439, 192, 32, 32)) )
+        self.gold_tiles = ( pygame.Surface.subsurface(main_img,       (207, 655, 26, 20)),
+                            pygame.Surface.subsurface(main_dark_img,  (207, 655, 26, 20)) )
+
 
 
 
@@ -1205,6 +1242,7 @@ class Viewer():
                        "S": self.snake_tiles,
                        "Y": self.yeti_tiles,
                        "D": self.dragon_tiles,
+                       "*": self.gold_tiles,
 
                        }  # rest of legend in wall_and_floor_theme
 
@@ -1259,6 +1297,7 @@ class Viewer():
                 distance = ((x - px) ** 2 + (y - py) ** 2) ** 0.5
                 # ---- check if tiles is outside torch radius of player ----
                 # ---- or otherwise (mostly) invisible
+                #print("dist, x, y", distance, x, y)
                 if distance > Game.torch_radius or Game.fov_map[y][x] == False:
                     # -- only blit (dark) if tile is explored. only draw explored Items (stairs)
                     if map_tile.explored:
@@ -1314,14 +1353,15 @@ class Viewer():
             if o.z == z and o.y == y and o.x == x:  # only care if in the correct dungeon level
                 # -- only care if NOT: Monster class instances or instances that are a child of the Monster class
                 if not o.is_member("Monster"):
-                    if o.char in "<>$":
+                    #if o.char in "<>$*": # TODO check if tuple instead surface
                         c=self.legend[o.char][0] # light tile
-                    else:
-                        c = self.legend[o.char]
+                    #else:
+                    #    print("ALAAAAAAAAAAAAAAARRRRRMMM")
+                    #    c = self.legend[o.char]
                     #print("c = ", c, o.char)
-                    o.explored = True   # redundant ?
+                        o.explored = True   # redundant ?
                     # self.screen.blit(c, (m.x * self.grid_size[0], m.y * self.grid_size[1]))
-                    self.tile_blit(c, o.x, o.y)
+                        self.tile_blit(c, o.x, o.y)
 
     def draw_monsters(self, x, y):
         z = self.game.player.z
@@ -1500,10 +1540,10 @@ class Viewer():
 
             self.playtime += seconds
             # --- check if the player has changed the dungeon level
-            if old_z != self.game.player.z:
-                recalculate_fov = True
-            else:
-                recalculate_fov = False
+            #if old_z != self.game.player.z:
+            #    recalculate_fov = True
+            #else:
+            #    recalculate_fov = False
             old_z = self.game.player.z
             # ---------animation -------
             if animation > self.playtime:
@@ -1570,32 +1610,36 @@ class Viewer():
                         animation = self.playtime + 1
                     # ---- -simple player movement with cursor keys -------
                     if event.key == pygame.K_RIGHT:
-                        #Game.turn += 1
                         self.new_turn()
                         recalculate_fov = True
-                        if not self.game.checkfight(self.game.player.x + 1, self.game.player.y, self.game.player.z):
-                            self.game.player.move(1, 0)
+                        self.game.move_player(1, 0)
+                        #if not self.game.checkfight(self.game.player.x + 1, self.game.player.y, self.game.player.z):
+                        #    self.game.player.move(1, 0)
 
                     if event.key == pygame.K_LEFT:
                         #Game.turn += 1
                         self.new_turn()
                         recalculate_fov = True
-                        if not self.game.checkfight(self.game.player.x - 1, self.game.player.y, self.game.player.z):
-                            self.game.player.move(-1, 0)
+                        self.game.move_player(-1,0)
+                        #if not self.game.checkfight(self.game.player.x - 1, self.game.player.y, self.game.player.z):
+                        #    self.game.player.move(-1, 0)
 
                     if event.key == pygame.K_UP:
                         #Game.turn += 1
                         self.new_turn()
                         recalculate_fov = True
-                        if not self.game.checkfight(self.game.player.x, self.game.player.y - 1, self.game.player.z):
-                            self.game.player.move(0, -1)
+                        self.game.move_player(0,-1)
+                        #if not self.game.checkfight(self.game.player.x, self.game.player.y - 1, self.game.player.z):
+                        #    self.game.player.move(0, -1)
                             # recalculate_fov = True
                     if event.key == pygame.K_DOWN:
                         #Game.turn += 1
                         self.new_turn()
                         recalculate_fov = True
-                        if not self.game.checkfight(self.game.player.x, self.game.player.y + 1, self.game.player.z):
-                            self.game.player.move(0, 1)
+                        self.game.move_player(0,1)
+                        #print("redraw after move", self.redraw)
+                        #if not self.game.checkfight(self.game.player.x, self.game.player.y + 1, self.game.player.z):
+                        #    self.game.player.move(0, 1)
                             # recalculate_fov = True
                     if event.key == pygame.K_SPACE:
                         #Game.turn += 1  # wait a turn
@@ -1612,13 +1656,15 @@ class Viewer():
 
                         self.redraw = True
                     if event.key == pygame.K_PAGEUP:
-                        Game.turn += 1
+                        self.new_turn()
                         # go up a level
                         self.game.ascend()
+                        self.redraw = True
                     if event.key == pygame.K_PAGEDOWN:
-                        Game.turn += 1
-                        ready = self.game.descend()
-                        # print("ready:", ready)
+                        self.new_turn()
+                        self.game.descend()
+                        self.redraw = True
+
                     if event.key == pygame.K_r:
                         # zoom out radar
                         self.radarblipsize *= 0.5
@@ -1634,16 +1680,20 @@ class Viewer():
                     # --- increase torch radius ---
                     if event.key == pygame.K_PLUS:
                         Game.torch_radius += 1
-                        recalculate_fov = True
+                        #recalculate_fov = True
+                        self.game.make_fov_map()
+                        self.redraw = True
                     # --- decrease torch radius ----
                     if event.key == pygame.K_MINUS:
                         Game.torch_radius -= 1
-                        recalculate_fov = True
+                        #recalculate_fov = True
+                        self.game.make_fov_map()
+                        self.redraw = True
 
             # ============== draw screen =================
-            if recalculate_fov:
-                self.redraw = True
-                self.game.make_fov_map()
+            #if recalculate_fov:
+            #    self.redraw = True
+            #    self.game.make_fov_map()
 
             if self.redraw:
                 if reset_cursor:
