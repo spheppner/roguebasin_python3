@@ -20,11 +20,17 @@ import random
 
 import os
 
+# declare constants
+ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"
 
 
-# TODO: cursor darf nicht in unerforschte zellen gehen
-# TODO diagonal movement for player ? or not allowing diagonal movement for monsters...
+
 # TODO monster speed > 1 tile possible ?
+# TODO monsters should appear as blip in radar
+# TODO rework NaturalWeapon
+# TODO Item
+# TODO Equipment
+# TODO Consumable
 
 class NaturalWeapon():
 
@@ -346,13 +352,14 @@ class Rect():
 
 class Tile():
     """# a tile of the map and its properties
-       block_movement means blocking the movement of Monster/Player, like a wall
+       block_movement means blocking the movement of Monster/Player, like a wall or water
        block_sight means blocking the field of view
+       block_flying means the tile blocks flying objects like arrows or flying monsters
     """
 
     # number = 0  # "globale" class variable
 
-    def __init__(self, char, block_movement=None, block_sight=None, explored=False):
+    def __init__(self, char, block_movement=None, block_sight=None, explored=False, block_flying=None):
         # self.number = Tile.number
         # Tile.number += 1 # each tile instance has a unique number
         # generate a number that is mostly 0,but very seldom 1 and very rarely 2 or 3
@@ -361,16 +368,20 @@ class Tile():
         self.char = char
         self.block_movement = block_movement
         self.block_sight = block_sight
+        self.block_flying = block_flying
         self.explored = explored
         # graphic_index is a random number to choose one of several graphical tiles
         #self.graphic_index = random.randint(1, 4)
         # --- some common tiles ---
         if char == "#":  # wall
             self.block_movement = True
+            self.block_flying = True
             self.block_sight = True
-            self.i = random.randint(1, 10)
+            #self.i = random.randint(1, 10)
+            self.decoration = randomizer((.55, 0.25, 0.15, 0.05))
         elif char == ".":  # floor
             self.block_movement = False
+            self.block_flying = False
             self.block_sight = False
             # self.i = random.randint(1,10)
 
@@ -429,9 +440,10 @@ class Scroll(Object):
         self.color = (200, 200, 0)
         self.char = "i"
         self.hint = "consumable magic scroll "
-        self.spell = random.choice(("blink", "blink", "fear",
+        self.spell = random.choice(("blink", "blink", "fear", "fear", "bleed", "bleed",
                                     "bleed", "magic map","magic map","magic map","magic map","magic map","magic map",
-                                    "magic missile", "fireball"))
+                                    "magic missile", "magic missile", "magic missile",
+                                    "fireball", "fireball", "fireball"))
         # disarm onfuse hurt bleed combat bless defense bless bull strenght dragon strenght superman
 
 class Gold(Object):
@@ -580,18 +592,19 @@ class Player(Monster):
         self.items = {}
         self.gold = 100
         self.scrolls = {}
+        self.scroll_list = []
         self.image_name = "arch-mage"
 
     def calculate_scroll_list(self):
         """returns a list of (key, spell name, number of scrolls) tuples"""
-        alphabet = "abcdefghijklmnopqrstuvwxyz"
+
         result = []
         for i, spell in enumerate(self.scrolls):
-            result.append((alphabet[i], spell, self.scrolls[spell]))
-        return result
+            result.append((ALPHABET[i], spell, self.scrolls[spell]))
+        self.scroll_list  =  result
 
     def spell_from_key(self, key):
-        for i, spell, number in ( self.calculate_scroll_list()):
+        for i, spell, number in  self.scroll_list:
             if i == key and number > 0:
                 return spell
         return None
@@ -627,14 +640,16 @@ class Game():
         Game.cursor_x = self.player.x
         Game.cursor_y = self.player.y
         # Monster(2,2,0)
-        Wolf(2, 2, 0)
-        Snake(3, 3, 0)
-        Yeti(4, 4, 0)
-        Dragon(25, 5, 0)
+        #Wolf(2, 2, 0)
+        #Snake(3, 3, 0)
+        #Yeti(4, 4, 0)
+        #Dragon(25, 5, 0)
         Shop(7,1,0)
         Gold(2,1,0)
-        for _ in range(20):
+        for _ in range(15):
             Scroll(4, 4, 0)
+            Scroll(5,4,0)
+            Scroll(4,6,0)
         #Scroll(4, 5, 0)
         self.log.append("Welcome to the first dungeon level (level 0)!")
         self.log.append("Use cursor keys to move around")
@@ -678,6 +693,7 @@ class Game():
                         self.player.scrolls[o.spell] += 1
                     else:
                         self.player.scrolls[o.spell] = 1
+                    self.player.calculate_scroll_list()
                     # kill this scroll instance in the dungeon
                     del Game.objects[o.number]
 
@@ -789,6 +805,52 @@ class Game():
     def check_player(self):
         if self.player.hitpoints <= 0:
             Game.game_over = True
+
+    def cast(self, spell):
+        if spell not in self.player.scrolls or self.player.scrolls[spell] < 1:
+            Game.log.append("You have currently no scroll of {}".format(spell))
+            return False # no casting
+        #----- spells that need no cursor position at all -----
+        if spell == "magic map":
+            # make all tiles in this dungeon level explored
+            for y, line in enumerate(Game.dungeon[self.player.z]):
+                for x, map_tile in enumerate(line):
+                    map_tile.explored = True
+            self.player.scrolls["magic map"] -= 1
+            self.player.calculate_scroll_list()
+            return True
+
+        #----- spells that need a cursor position different from player position ---
+        if Game.cursor_y == 0 and Game.cursor_x == 0:
+            Game.log.append("you must select another tile with cursor (w,a,s,d) before casting {}".format(spell))
+            return False  # no casting
+
+        if spell == "blink":
+            # teleport to cursor position TODO: check for wall and illegal landing tiles
+            target_tile = Game.dungeon[self.player.z][self.player.y + Game.cursor_y][self.player.x + Game.cursor_x]
+            if not target_tile.explored:
+                Game.log.append("You can not blink on a unexplored tile.")
+                return False
+            if target_tile.block_movement:
+                Game.log.append("You can not blink to this tile.")
+                return False
+            if not Game.fov_map[self.player.y+Game.cursor_y][self.player.x + Game.cursor_x]:
+                Game.log.append("You can not blink on a tile outside your field of view")
+                return False
+            for o in Game.objects.values():
+                if ( o.z == self.player.z and o.y == self.player.y + Game.cursor_y and
+                     o.x == self.player.x + Game.cursor_x and o != self.player and
+                     o.is_member("Monster") and o.hitpoints > 0 ):
+                        Game.log.append("You can not blink on top of a monster")
+                        return False
+
+            self.move_player(Game.cursor_x, Game.cursor_y)
+            self.player.scrolls["blink"] -= 1
+            self.player.calculate_scroll_list()
+            return True
+
+
+
 
     def load_level(self, z, name, folder="data"):
         """load a text file and return a list of non-empty lines without newline characters"""
@@ -1557,7 +1619,7 @@ class Viewer():
             write(self.panelscreen, text=" Magic Scrolls ", color=(80,0,80),
                   font_size = 22, x=5, y=y)
             y += 20
-        for key, spell, number in self.game.player.calculate_scroll_list():
+        for key, spell, number in self.game.player.scroll_list:
             t = "{}: {} x {}".format(key, spell, number)
             write(self.panelscreen, text=t, x=5, y=y, color=(255, 255, 255), font_size=14)
             y += 15
@@ -1646,6 +1708,14 @@ class Viewer():
                 self.draw_panel()
                 self.draw_log()
                 continue
+
+            # ------------ pressed keys (in this moment pressed down)------
+            pressed_keys = pygame.key.get_pressed()
+            if pressed_keys[pygame.K_LSHIFT]:
+                show_range = True
+            else:
+                show_range = False
+
             # self.oldscreen = self.screen
             # -------- events ------
             for event in pygame.event.get():
@@ -1681,16 +1751,13 @@ class Viewer():
                         # Game.cursor_y += 1
 
                     # ----- activate blink scroll, jump to cursor pos -----
-                    if event.key == pygame.K_b:
-                        if "blink" in self.game.player.scrolls and self.game.player.scrolls["blink"] > 0:
-                            if Game.cursor_y != 0 or Game.cursor_x != 0:
-                                self.new_turn()
-                                self.game.move_player(Game.cursor_x, Game.cursor_y)
-                                self.game.player.scrolls["blink"] -= 1
-                            else:
-                                Game.log.append("you must select another tile with cursor (w,a,s,d) before blinking")
-                        else:
-                            Game.log.append("You have currently no blink scroll")
+                    # ----------- magic with ctrl key and dynamic key -----
+                    #if pressed_keys[pygame.K_RCTRL] or pressed_keys[pygame.K_LCTRL]:
+                    if event.mod & pygame.KMOD_CTRL: # any or both ctrl keys are pressed
+                        key =  pygame.key.name(event.key) # name of event key: a, b, c etc.
+                        spell = self.game.player.spell_from_key(key) # get the spell that is currently bond to this key
+                        if self.game.cast(spell): # sucessfull casting -> new turn
+                            self.new_turn()
 
                     # ---- shoot laser beam to cursor -----
                     if event.key == pygame.K_1:
@@ -1794,12 +1861,7 @@ class Viewer():
 
             self.redraw = False
 
-            # ------------ pressed keys ------
-            pressed_keys = pygame.key.get_pressed()
-            if pressed_keys[pygame.K_LSHIFT]:
-                show_range = True
-            else:
-                show_range = False
+
             # if pressed_keys[pygame.K_SPACE]:
             #    pass
 
