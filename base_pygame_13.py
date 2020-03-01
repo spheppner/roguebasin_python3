@@ -421,6 +421,19 @@ class Object():
             return True
         return False
 
+
+class Scroll(Object):
+    """a scroll with a spell on it"""
+
+    def _overwrite(self):
+        self.color = (200, 200, 0)
+        self.char = "i"
+        self.hint = "consumable magic scroll "
+        self.spell = random.choice(("blink", "blink", "fear",
+                                    "bleed", "magic map","magic map","magic map","magic map","magic map","magic map",
+                                    "magic missile", "fireball"))
+        # disarm onfuse hurt bleed combat bless defense bless bull strenght dragon strenght superman
+
 class Gold(Object):
     """a heap of gold"""
 
@@ -566,7 +579,23 @@ class Player(Monster):
         self.natural_weapons = [Fist(), Kick()]
         self.items = {}
         self.gold = 100
+        self.scrolls = {}
         self.image_name = "arch-mage"
+
+    def calculate_scroll_list(self):
+        """returns a list of (key, spell name, number of scrolls) tuples"""
+        alphabet = "abcdefghijklmnopqrstuvwxyz"
+        result = []
+        for i, spell in enumerate(self.scrolls):
+            result.append((alphabet[i], spell, self.scrolls[spell]))
+        return result
+
+    def spell_from_key(self, key):
+        for i, spell, number in ( self.calculate_scroll_list()):
+            if i == key and number > 0:
+                return spell
+        return None
+
 
 
 class Game():
@@ -604,6 +633,9 @@ class Game():
         Dragon(25, 5, 0)
         Shop(7,1,0)
         Gold(2,1,0)
+        for _ in range(20):
+            Scroll(4, 4, 0)
+        #Scroll(4, 5, 0)
         self.log.append("Welcome to the first dungeon level (level 0)!")
         self.log.append("Use cursor keys to move around")
         self.load_level(0, "level001.txt", "data")
@@ -640,6 +672,14 @@ class Game():
                     # kill gold from dungeon
                     del Game.objects[o.number]
 
+                elif o.is_member("Scroll"):
+                    Game.log.append("you found a scroll of {}".format(o.spell))
+                    if o.spell in self.player.scrolls:
+                        self.player.scrolls[o.spell] += 1
+                    else:
+                        self.player.scrolls[o.spell] = 1
+                    # kill this scroll instance in the dungeon
+                    del Game.objects[o.number]
 
 
 
@@ -1255,6 +1295,8 @@ class Viewer():
                             pygame.Surface.subsurface(feats_dark_img, (439, 192, 32, 32)) )
         self.gold_tiles = ( pygame.Surface.subsurface(main_img,       (207, 655, 26, 20)),
                             pygame.Surface.subsurface(main_dark_img,  (207, 655, 26, 20)) )
+        self.scroll_tiles = (pygame.Surface.subsurface(main_img, (188, 412, 27, 28)),
+                             pygame.Surface.subsurface(main_dark_img, (188, 412, 27, 28)))
 
 
 
@@ -1271,6 +1313,7 @@ class Viewer():
                        "Y": self.yeti_tiles,
                        "D": self.dragon_tiles,
                        "*": self.gold_tiles,
+                       "i": self.scroll_tiles,
 
                        }  # rest of legend in wall_and_floor_theme
 
@@ -1509,6 +1552,16 @@ class Viewer():
             write(self.panelscreen, text=h, x=5, y=y, color=(0,0,0), font_size=10)
             y += 20
 
+        # ---- magic scrolls -----
+        if len(self.game.player.scrolls) > 0:
+            write(self.panelscreen, text=" Magic Scrolls ", color=(80,0,80),
+                  font_size = 22, x=5, y=y)
+            y += 20
+        for key, spell, number in self.game.player.calculate_scroll_list():
+            t = "{}: {} x {}".format(key, spell, number)
+            write(self.panelscreen, text=t, x=5, y=y, color=(255, 255, 255), font_size=14)
+            y += 15
+
         # blit panelscreen
         # ----- friend and foe ----
         #self.panelscreen.blit(self.images[Game.friend_image], (10, 400))
@@ -1626,6 +1679,19 @@ class Viewer():
                         reset_cursor = False
 
                         # Game.cursor_y += 1
+
+                    # ----- activate blink scroll, jump to cursor pos -----
+                    if event.key == pygame.K_b:
+                        if "blink" in self.game.player.scrolls and self.game.player.scrolls["blink"] > 0:
+                            if Game.cursor_y != 0 or Game.cursor_x != 0:
+                                self.new_turn()
+                                self.game.move_player(Game.cursor_x, Game.cursor_y)
+                                self.game.player.scrolls["blink"] -= 1
+                            else:
+                                Game.log.append("you must select another tile with cursor (w,a,s,d) before blinking")
+                        else:
+                            Game.log.append("You have currently no blink scroll")
+
                     # ---- shoot laser beam to cursor -----
                     if event.key == pygame.K_1:
                         # laser = 1
