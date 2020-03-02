@@ -425,12 +425,7 @@ class Object():
     def _overwrite(self):
         pass
 
-    def is_member(self, name):
-        """returns True if the instance is a member of the 'name' class or a child of it"""
-        class_names = [c.__name__ for c in self.__class__.mro()]  # if c.__name__ != "object"]
-        if name in class_names:
-            return True
-        return False
+
 
 
 class Scroll(Object):
@@ -515,7 +510,7 @@ class Monster(Object):
             raise SystemError("out of dungeon?", self.x, self.y, self.z)
         # --- check if monsters is trying to run into a wall ---
         if target.block_movement:
-            if self.is_member("Player"):
+            if isinstance(self, Player):
                 self.hitpoints -= 1
                 Game.log.append("ouch!")  # movement is not possible
             return
@@ -666,7 +661,7 @@ class Game():
     def new_turn(self):
         self.turn += 1
         for o in Game.objects.values():
-            if o.z == self.player.z and o != self.player and o.hitpoints > 0 and o.is_member("Monster"):
+            if o.z == self.player.z and o != self.player and o.hitpoints > 0 and isinstance(o, Monster):
                 self.move_monster(o)
 
     def player_has_new_position(self):
@@ -676,18 +671,18 @@ class Game():
         myfloor = []
         for o in Game.objects.values():
             if (o.z == self.player.z and o.hitpoints > 0 and
-                not o.is_member("Monster") and
+                not isinstance(o, Monster) and
                 o.x == self.player.x and o.y == self.player.y):
                 myfloor.append(o)
         if len(myfloor) > 0:
             for o in myfloor:
-                if o.is_member("Gold"):
+                if isinstance(o, Gold):
                     Game.log.append("You found {} gold!".format(o.value))
                     self.player.gold += o.value
                     # kill gold from dungeon
                     del Game.objects[o.number]
 
-                elif o.is_member("Scroll"):
+                elif  isinstance(o, Scroll):
                     Game.log.append("you found a scroll of {}".format(o.spell))
                     if o.spell in self.player.scrolls:
                         self.player.scrolls[o.spell] += 1
@@ -707,7 +702,7 @@ class Game():
                 continue
             if o.hitpoints <= 0:
                 continue
-            if not o.is_member("Monster"):
+            if not isinstance(o, Monster):
                 continue
             if o.z == z:
                 if o.x > self.player.x:
@@ -742,7 +737,7 @@ class Game():
                 continue
             if o.hitpoints < 1:
                 continue
-            if not o.is_member("Monster"):
+            if not isinstance(o, Monster):
                 continue
             if o.x == m.x + dx and o.y == m.y + dy:
                 dx, dy = 0, 0
@@ -840,7 +835,7 @@ class Game():
             for o in Game.objects.values():
                 if ( o.z == self.player.z and o.y == self.player.y + Game.cursor_y and
                      o.x == self.player.x + Game.cursor_x and o != self.player and
-                     o.is_member("Monster") and o.hitpoints > 0 ):
+                     isinstance(o, Monster) and o.hitpoints > 0 ):
                         Game.log.append("You can not blink on top of a monster")
                         return False
 
@@ -944,7 +939,7 @@ class Game():
             # collect all stairs down from previous level,
             # make at same position a stair up, carve a tunnel to a random room if necessary
             stairlist = [(o.x, o.y) for o in Game.objects.values() if
-                         o.char == ">" and o.z == z - 1 and o.is_member("Stair")]
+                         o.char == ">" and o.z == z - 1 and isinstance(o, Stair )]
             print("creating prev stairlist:", stairlist)
             for (x, y) in stairlist:
                 if Game.dungeon[z][y][x].char != ".":
@@ -976,7 +971,7 @@ class Game():
     def use_stairs(self):
         """go up or done one dungeon level, depending on stair"""
         for o in Game.objects.values():
-            if o.is_member("Stair") and o.char in "<>" and o.z == self.player.z and o.y == self.player.y and o.x == self.player.x:
+            if isinstance(o, Stair)  and o.char in "<>" and o.z == self.player.z and o.y == self.player.y and o.x == self.player.x:
                 break # all ok, found a stair
         else:
             Game.log.append("You must find a stair up to ascend or descend")
@@ -1485,7 +1480,7 @@ class Viewer():
         for o in Game.objects.values():
             if o.z == z and o.y == y and o.x == x:  # only care if in the correct dungeon level
                 # -- only care if NOT: Monster class instances or instances that are a child of the Monster class
-                if not o.is_member("Monster"):
+                if not isinstance(o, Monster):
                     #if o.char in "<>$*": # TODO check if tuple instead surface
                         c=self.legend[o.char][0] # light tile
                     #else:
@@ -1501,7 +1496,7 @@ class Viewer():
         for o in Game.objects.values():
             if o.z == z and o.y == y and o.x == x:  # only care if in the correct dungeon level
                 # -- only care for Monster class instances or instances that are a child of the Monster class --
-                if o.is_member("Monster") and o.hitpoints > 0:
+                if isinstance(o, Monster) and o.hitpoints > 0:
                     c = self.legend[o.char][o.look_direction]  # looks left or right
                     # self.screen.blit(c, (o.x * self.grid_size[0], o.y * self.grid_size[1]))
                     # correction so that if monster surface != size of tile surface monster is centered on tile
@@ -1544,7 +1539,7 @@ class Viewer():
                                      (self.rcx - dx, self.rcy - dy, self.radarblipsize, self.radarblipsize))
                 # ---if a stair is there, paint it (if explored) ---
                 for o in Game.objects.values():
-                    if o.z == self.game.player.z and o.y == y and o.x == x and o.is_member("Stair") and o.explored:
+                    if o.z == self.game.player.z and o.y == y and o.x == x and isinstance(o, Stair) and o.explored:
                         if o.char == ">":
                             color = (128, 255, 128)
                         else:
@@ -1658,6 +1653,32 @@ class Viewer():
         self.redraw = True
         #self.redraw = True
 
+    def play_animation(self, animation):
+        # --- draw laser beam -----
+        c = (0, 0, random.randint(10, 250))
+        w = random.randint(1, 4)
+        d = 8  # distance from corner of grid toward center for laser start points
+        startpoints = [(d, d),
+                       (self.grid_size[0] - d, d),
+                       (d, self.grid_size[1] - d),
+                       (self.grid_size[0] - d, self.grid_size[1] - d)]
+        lasertarget = (Game.cursor_x, Game.cursor_y)
+        for x, y in startpoints:
+            pygame.draw.line(self.screen, c,
+                             (self.pcx + x, self.pcy + y),
+                             (self.pcx + self.grid_size[0] // 2 + lasertarget[0] * self.grid_size[0],
+                              self.pcy + self.grid_size[1] // 2 + lasertarget[1] * self.grid_size[1]),
+                             w)
+
+        pygame.display.flip()
+        self.screen.blit(self.background, (0, 0))
+        # --- order of drawing (back to front) ---
+        self.draw_dungeon()
+        self.draw_radar()
+        self.draw_panel()
+        self.draw_log()
+        #continue
+
     def run(self):
         """The mainloop"""
         running = True
@@ -1670,9 +1691,10 @@ class Viewer():
         show_range = False
         animation = 0
         reset_cursor = True
+        log_lines = len(Game.log)
         while running:
 
-            self.game.check_player()
+            self.game.check_player()  # if player has hitpoints left
             if Game.game_over:
                 running = False
             milliseconds = self.clock.tick(self.fps)  #
@@ -1685,36 +1707,16 @@ class Viewer():
 
             # ---------animation -------
             if animation > self.playtime:
-                # --- draw laser beam -----
-                c = (0, 0, random.randint(10, 250))
-                w = random.randint(1, 4)
-                d = 8  # distance from corner of grid toward center for laser start points
-                startpoints = [(d, d),
-                               (self.grid_size[0] - d, d),
-                               (d, self.grid_size[1] - d),
-                               (self.grid_size[0] - d, self.grid_size[1] - d)]
-                for x, y in startpoints:
-                    pygame.draw.line(self.screen, c,
-                                     (self.pcx + x, self.pcy + y),
-                                     (self.pcx + self.grid_size[0] // 2 + lasertarget[0] * self.grid_size[0],
-                                      self.pcy + self.grid_size[1] // 2 + lasertarget[1] * self.grid_size[1]),
-                                     w)
+                self.play_animation(animation)
+                continue # ignore rest of main loop
 
-                pygame.display.flip()
-                self.screen.blit(self.background, (0, 0))
-                # --- order of drawing (back to front) ---
-                self.draw_dungeon()
-                self.draw_radar()
-                self.draw_panel()
-                self.draw_log()
-                continue
-
+            # ----------- End of animation --------------
             # ------------ pressed keys (in this moment pressed down)------
             pressed_keys = pygame.key.get_pressed()
-            if pressed_keys[pygame.K_LSHIFT]:
-                show_range = True
-            else:
-                show_range = False
+            #if pressed_keys[pygame.K_LSHIFT]:
+            #    show_range = True
+            #else:
+            #    show_range = False
 
             # self.oldscreen = self.screen
             # -------- events ------
@@ -1750,7 +1752,7 @@ class Viewer():
 
                         # Game.cursor_y += 1
 
-                    # ----- activate blink scroll, jump to cursor pos -----
+
                     # ----------- magic with ctrl key and dynamic key -----
                     #if pressed_keys[pygame.K_RCTRL] or pressed_keys[pygame.K_LCTRL]:
                     if event.mod & pygame.KMOD_CTRL: # any or both ctrl keys are pressed
@@ -1762,7 +1764,7 @@ class Viewer():
                     # ---- shoot laser beam to cursor -----
                     if event.key == pygame.K_1:
                         # laser = 1
-                        lasertarget = (Game.cursor_x, Game.cursor_y)
+
                         animation = self.playtime + 1
                     # ---- -simple player movement with cursor keys -------
                     if event.key in ( pygame.K_RIGHT, pygame.K_KP6 ) :
@@ -1843,8 +1845,9 @@ class Viewer():
                         self.redraw = True
 
             # ============== draw screen =================
-
+            dirtyrects = []
             if self.redraw:
+
                 if reset_cursor:
                     Game.cursor_x, Game.cursor_y = 0, 0
                 reset_cursor = True
@@ -1854,31 +1857,33 @@ class Viewer():
                 self.draw_dungeon()
 
                 self.draw_radar()
+                dirtyrects.append((0, 0, Viewer.width, Viewer.height))
                 # self.draw_panel()
-            self.draw_log()
+                self.draw_log()
+
+            elif len(Game.log) > log_lines:
+                self.draw_log()   # always draw log
+                log_lines = len(Game.log)
+                dirtyrects.append(( 0, Viewer.height - self.log_height, Viewer.width, self.log_height))
 
             self.draw_panel()  # always draw panel
+            dirtyrects.append((Viewer.width-self.panel_width, 0, Viewer.panel_width, Viewer.height))
 
             self.redraw = False
 
 
-            # if pressed_keys[pygame.K_SPACE]:
-            #    pass
-
             # ------ mouse handler ------
-            left, middle, right = pygame.mouse.get_pressed()
-            # if oldleft and not left:
-            #    self.launchRocket(pygame.mouse.get_pos())
-            oldleft, oldmiddle, oldright = left, middle, right
+            #left, middle, right = pygame.mouse.get_pressed()
+            #oldleft, oldmiddle, oldright = left, middle, right
 
             # ------ joystick handler -------
-            for number, j in enumerate(self.joysticks):
-                if number == 0:
-                    x = j.get_axis(0)
-                    y = j.get_axis(1)
-                    buttons = j.get_numbuttons()
-                    for b in range(buttons):
-                        pushed = j.get_button(b)
+            #for number, j in enumerate(self.joysticks):
+            #    if number == 0:
+            #        x = j.get_axis(0)
+            #        y = j.get_axis(1)
+            #        buttons = j.get_numbuttons()
+            #        for b in range(buttons):
+            #            pushed = j.get_button(b)
 
             # write text below sprites
             fps_text = "FPS: {:5.3}".format(self.clock.get_fps())
@@ -1886,18 +1891,20 @@ class Viewer():
             write(self.screen, text=fps_text, origin="bottomright", x=Viewer.width - 2, y=Viewer.height - 2,
                   font_size=16, bold=True, color=(0, 0, 0))
 
-            if show_range:
-                pygame.draw.circle(self.screen, (200, 0, 0),
-                                   (self.pcx, self.pcy),
-                                   Game.torch_radius * self.grid_size[0], 1)
+            #if show_range:
+            #    pygame.draw.circle(self.screen, (200, 0, 0),
+            #                       (self.pcx, self.pcy),
+            #                       Game.torch_radius * self.grid_size[0], 1)
             # ------ Cursor -----
-            self.cursor.create_image()
+
             if Game.cursor_y != 0 or Game.cursor_x != 0: # only blit cursor if outside player
+                self.cursor.create_image()
                 self.screen.blit(self.cursor.image, (
                     self.pcx + Game.cursor_x * self.grid_size[0],
                     self.pcy + Game.cursor_y * self.grid_size[1]))
             # -------- next frame -------------
-            pygame.display.flip()
+            #pygame.display.flip() # use update(rectlist) instead
+            pygame.display.update(dirtyrects)
         # -----------------------------------------------------
         pygame.mouse.set_visible(True)
         pygame.quit()
