@@ -10,5 +10,5 @@ make sure you have python3 and pygame (for python3) properly installed
 
 on linux:
 
-'''sudo apt install python3 python3-pip'''
-'''sudo pip3 install pygame'''
+''sudo apt install python3 python3-pip''
+'sudo pip3 install pygame'
