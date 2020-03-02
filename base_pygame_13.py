@@ -427,11 +427,18 @@ class Object():
 
 
 
+class Item(Object):
+    """an item that you can pick up"""
 
-class Scroll(Object):
+    def _overwrite(self):
+        self.color = (255,165,0) # orange
+        self.weight = 0
+
+class Scroll(Item):
     """a scroll with a spell on it"""
 
     def _overwrite(self):
+        super()._overwrite()
         self.color = (200, 200, 0)
         self.char = "i"
         self.hint = "consumable magic scroll "
@@ -441,10 +448,11 @@ class Scroll(Object):
                                     "fireball", "fireball", "fireball"))
         # disarm onfuse hurt bleed combat bless defense bless bull strenght dragon strenght superman
 
-class Gold(Object):
+class Gold(Item):
     """a heap of gold"""
 
     def _overwrite(self):
+        super()._overwrite()
         self.color = (200,200,0)
         self.char="*"
         self.value = random.randint(1,100)
@@ -523,6 +531,7 @@ class Monster(Object):
 class Wolf(Monster):
 
     def _overwrite(self):
+        super()._overwrite()
         self.char = "W"
         self.aggro = 5
         self.hitpoints = 30
@@ -534,9 +543,11 @@ class Wolf(Monster):
         self.image_name = "direwolf"
 
 
+
 class Snake(Monster):
 
     def _overwrite(self):
+        super()._overwrite()
         self.char = "S"
         self.aggro = 2
         self.hitpoints = 20
@@ -550,6 +561,7 @@ class Snake(Monster):
 class Yeti(Monster):
 
     def _overwrite(self):
+        super()._overwrite()
         self.char = "Y"
         self.aggro = 4
         self.hitpoints = 20
@@ -563,6 +575,7 @@ class Yeti(Monster):
 class Dragon(Monster):
 
     def _overwrite(self):
+        super()._overwrite()
         self.char = "D"
         self.aggro = 6
         self.hitpoints = 50
@@ -588,7 +601,10 @@ class Player(Monster):
         self.gold = 100
         self.scrolls = {}
         self.scroll_list = []
+        self.victims = {}
         self.image_name = "arch-mage"
+        self.sniffrange_monster = 4
+        self.sniffrange_items = 6
 
     def calculate_scroll_list(self):
         """returns a list of (key, spell name, number of scrolls) tuples"""
@@ -635,10 +651,10 @@ class Game():
         Game.cursor_x = self.player.x
         Game.cursor_y = self.player.y
         # Monster(2,2,0)
-        #Wolf(2, 2, 0)
-        #Snake(3, 3, 0)
-        #Yeti(4, 4, 0)
-        #Dragon(25, 5, 0)
+        Wolf(2, 2, 0)
+        Snake(3, 3, 0)
+        Yeti(4, 4, 0)
+        Dragon(30, 5, 0)
         Shop(7,1,0)
         Gold(2,1,0)
         for _ in range(15):
@@ -660,9 +676,11 @@ class Game():
 
     def new_turn(self):
         self.turn += 1
-        for o in Game.objects.values():
-            if o.z == self.player.z and o != self.player and o.hitpoints > 0 and isinstance(o, Monster):
-                self.move_monster(o)
+        #for o in Game.objects.values():
+        #    if o.z == self.player.z and o != self.player and o.hitpoints > 0 and isinstance(o, Monster):
+        #problem: move_monster can lead to a fight, monster may die and removed from Game.objects, while iterating over Game.objects
+        for m in [o for o in Game.objects.values() if o.z == self.player.z and o != self.player and o.hitpoints > 0 and isinstance(o, Monster)]:
+            self.move_monster(m)
 
     def player_has_new_position(self):
         """called after postion change of player,
@@ -752,9 +770,24 @@ class Game():
 
 
     def fight(self, a, b):
-        self.strike(a, b)
+        self.strike(a, b)   # first strike
         if b.hitpoints > 0:
-            self.strike(b, a)
+            self.strike(b, a)  # counterstrike
+        # remove dead monsters from game
+        for monster in (a, b):  # a monster is a Game.object.value, the key is it's number
+            if monster != self.player and monster.hitpoints <= 0:
+                name = monster.__class__.__name__
+                if name not in self.player.victims:
+                    self.player.victims[name] = 1
+                else:
+                    self.player.victims[name] += 1
+                del Game.objects[monster.number]
+
+
+
+
+
+
         # big images
         #if a == self.player:
         #    Game.friend_image = "arch-mage-attack"
@@ -870,6 +903,12 @@ class Game():
                 if char == "*":
                     row.append(Tile("."))
                     Gold(x,y,z, char)
+                if char == "M":
+                    row.append(Tile("."))
+                    if random.random() < 0.5:
+                        Wolf(x,y,z)
+                    else:
+                        Snake(x,y,z)
             level.append(row)
         try:
             Game.dungeon[z] = level
@@ -1280,17 +1319,15 @@ class Viewer():
 
     def create_tiles(self):
         """load tilemap images and create tiles for blitting"""
-
-        player_img = pygame.image.load(
-            os.path.join("data", "player.png"))  # spritesheed, mostly 32x32, figures looking to the left
-        player_img.convert_alpha()
-        self.walls_img = pygame.image.load(os.path.join("data", "wall.png"))  # spritesheet 32x32 pixel
-        self.floors_img = pygame.image.load(os.path.join("data", "floor.png"))  # spritesheet 32x32 pixel
+        # those are sprite-sheets, taken from dungeon crawl
+        player_img = pygame.image.load(os.path.join("data", "player.png")).convert_alpha()  # spritesheed, mostly 32x32, figures looking to the left
+        self.walls_img = pygame.image.load(os.path.join("data", "wall.png")).convert_alpha()  # spritesheet 32x32 pixel
+        self.floors_img = pygame.image.load(os.path.join("data", "floor.png")).convert_alpha()  # spritesheet 32x32 pixel
         self.walls_dark_img = self.walls_img.copy()
         self.floors_dark_img = self.floors_img.copy()
-        feats_img = pygame.image.load(os.path.join("data", "feat.png"))
+        feats_img = pygame.image.load(os.path.join("data", "feat.png")).convert_alpha()
         feats_dark_img = feats_img.copy()
-        main_img = pygame.image.load(os.path.join("data", "main.png"))
+        main_img = pygame.image.load(os.path.join("data", "main.png")).convert_alpha()
         main_dark_img = main_img.copy()
         # blit a darker picture over the original to darken
         darken_percent = .50
@@ -1299,6 +1336,7 @@ class Viewer():
             dark = pygame.surface.Surface(original.get_size()).convert_alpha()
             dark.fill((0, 0, 0, darken_percent * 255))
             copy.blit(dark, (0, 0))  # blit dark surface over original
+            copy.convert_alpha()
 
         # ---- tiles for Monsters are tuples. first item looks to the left, second item looks to the right
         # self.wolf_tile = make_text("W", font_color=(100, 100, 100), grid_size=self.grid_size)[0]
@@ -1506,11 +1544,11 @@ class Viewer():
                         corr_y = (self.grid_size[1] - c.get_size()[1])//2
 
 
-                    if o == self.game.player:
-                        self.screen.blit(c, (self.pcx+corr_x, self.pcy+corr_y))  # blit the player always in middle of screen
-                    else:
-                        o.explored = True
-                        self.tile_blit(c, o.x, o.y, corr_x, corr_y)
+                    #if o == self.game.player:
+                    #    self.screen.blit(c, (self.pcx+corr_x, self.pcy+corr_y))  # blit the player always in middle of screen
+                    #else:
+                    o.explored = True
+                    self.tile_blit(c, o.x, o.y, corr_x, corr_y)
                     break  # one monster per tile is enough
 
     def draw_radar(self):
@@ -1524,28 +1562,41 @@ class Viewer():
             for y in range(self.game.player.y - delta_tiles, self.game.player.y + delta_tiles + 1):
                 if y < 0:
                     continue
+                distance = ( (x-self.game.player.x)**2 + (y-self.game.player.y)**2 )** 0.5
                 try:
                     t = Game.dungeon[self.game.player.z][y][x]
                 except:
                     continue
+                color = (10, 10, 10) # black
+                dx = -(x - self.game.player.x) * self.radarblipsize
+                dy = -(y - self.game.player.y) * self.radarblipsize
                 if t.explored:
                     if t.block_movement:
                         color = (50, 50, 250)  # blue wall
                     else:
                         color = (150, 150, 150)  # light grey corridor
-                    dx = -(x - self.game.player.x) * self.radarblipsize
-                    dy = -(y - self.game.player.y) * self.radarblipsize
-                    pygame.draw.rect(self.radarscreen, color,
-                                     (self.rcx - dx, self.rcy - dy, self.radarblipsize, self.radarblipsize))
+                    #pygame.draw.rect(self.radarscreen, color,
+                    #                 (self.rcx - dx, self.rcy - dy, self.radarblipsize, self.radarblipsize))
                 # ---if a stair is there, paint it (if explored) ---
                 for o in Game.objects.values():
-                    if o.z == self.game.player.z and o.y == y and o.x == x and isinstance(o, Stair) and o.explored:
-                        if o.char == ">":
-                            color = (128, 255, 128)
-                        else:
-                            color = (128, 0, 128)
-                        pygame.draw.rect(self.radarscreen, color,
-                                         (self.rcx - dx, self.rcy - dy, self.radarblipsize, self.radarblipsize))
+                    if o.z == self.game.player.z and o.y == y and o.x == x:
+                        if isinstance(o, Stair) and o.explored:
+                            if o.char == ">":
+                                color = (128, 255, 128)
+                            else:
+                                color = (64, 255, 64)
+                        elif isinstance(o, Shop) and o.explored:
+                            color = (200,200,200)
+                        elif isinstance(o, Item):
+                            if Game.fov_map[y][x] or distance < self.game.player.sniffrange_items:
+                                 color = (0,200,0)
+                        elif isinstance(o, Monster):
+                            if Game.fov_map[y][x] or distance < self.game.player.sniffrange_monster:
+                                 color = (255,0,0)
+
+
+                pygame.draw.rect(self.radarscreen, color,
+                        (self.rcx - dx, self.rcy - dy, self.radarblipsize, self.radarblipsize))
         # make withe glowing dot at center of radarmap
         white = random.randint(200, 255)
         color = (white, white, white)
@@ -1611,8 +1662,8 @@ class Viewer():
 
         # ---- magic scrolls -----
         if len(self.game.player.scrolls) > 0:
-            write(self.panelscreen, text=" Magic Scrolls ", color=(80,0,80),
-                  font_size = 22, x=5, y=y)
+            write(self.panelscreen, text="Magic: use CTRL+", color=(80,0,80),
+                  font_size = 20, x=5, y=y)
             y += 20
         for key, spell, number in self.game.player.scroll_list:
             t = "{}: {} x {}".format(key, spell, number)
@@ -1908,6 +1959,9 @@ class Viewer():
         # -----------------------------------------------------
         pygame.mouse.set_visible(True)
         pygame.quit()
+        print("you killed:")
+        for v in self.game.player.victims:
+            print(v, self.game.player.victims[v])
 
 
 if __name__ == '__main__':
