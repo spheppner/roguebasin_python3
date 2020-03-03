@@ -1418,6 +1418,8 @@ class Viewer():
 
     def wall_and_floor_theme(self):
         """select a set of floor/walltiles, depending on level number (z)"""
+        # manipulate random seed so that each dungeon level always generate the same random tiles
+        random.seed(self.game.player.z)
         # ---------------------------- walls ----------------------
         # walls: all tiles 32x32, huge image is 1024x1280 x(topleft), y(topleft), how many elements to the right
         walls = random.choice([(0, 0, 8),(256,0,8), (512,0,8), (768,0,8),
@@ -1426,14 +1428,23 @@ class Viewer():
                  (0, 96, 8), (256, 96, 8), (512, 96, 8), (768, 96, 8),
                  (0, 128, 8), (256, 128, 8), (512, 128, 8), (768, 128, 8),
                  (0, 160, 8), (256, 160, 8), (512, 160, 8), (768, 160, 8),
-                 (0, 192, 8), (256, 192, 8), (512, 192, 8), (768, 192, 8),
+                 (0, 192, 8), (256, 192, 8), (512, 192, 8), (768, 192, 4),
                  ])
+
+        walls = (992,384,5)
+
         # ---- add single subimages to darkwalls and lightwalls---
         # x1,y1, x2,y2: 0,225, 32 , 256
         # see class floor, attribute decoration for probability. first img comes most often
         mywalls = []
         for i in range(walls[2]):
-            mywalls.append((walls[0]+i*32, walls[1]))
+            x = walls[0]+i * 32
+            y= walls[1]
+            if x > 1024-32:
+                x = x - 1024
+                y += 32
+
+            mywalls.append((x, y))
         self.darkwalls = []
         self.lightwalls = []
         for (x, y) in mywalls:
@@ -1442,13 +1453,21 @@ class Viewer():
         # ---------------------- floors ------------------
         # floor.png 1024x960, tiles are 32x32
         # floors: all32x32: x(topleft), y(topleft), how many elements
+
+        ##floors = (928,512,10)
+
         floors = random.choice([(576, 0, 9),(128,32,9), (416,32,9), (704,32,9), (256,64,9), (544,64,9),
                                 (96,96,9), (384,96,9), (672,96,9), (224,128,9), (512,128,9),(64,160,4),
                                 (192,160,4), (320,160,4) , (448,160,9),
                                ])
         myfloors = []
         for i in range(floors[2]):
-            myfloors.append((floors[0]+i*32, floors[1]))
+            x = floors[0] + i * 32
+            y = floors[1]
+            if x > 1024 - 32:
+                x = x - 1024
+                y += 32
+            myfloors.append((x,y))
         self.darkfloors = []
         self.lightfloors = []
         for (x, y) in myfloors:
