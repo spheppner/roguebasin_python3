@@ -21,7 +21,7 @@ import random
 import os
 
 # declare constants
-ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"
+ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 
 
@@ -31,6 +31,212 @@ ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"
 # TODO Item
 # TODO Equipment
 # TODO Consumable
+
+
+class VectorSprite(pygame.sprite.Sprite):
+    """base class for sprites. this class inherits from pygames sprite class"""
+    number = 0
+    numbers = {} # { number, Sprite }
+
+    def __init__(self, **kwargs):
+        self._default_parameters(**kwargs)
+        self._overwrite_parameters()
+        pygame.sprite.Sprite.__init__(self, self.groups) #call parent class. NEVER FORGET !
+        self.number = VectorSprite.number # unique number for each sprite
+        VectorSprite.number += 1
+        VectorSprite.numbers[self.number] = self
+        self.create_image()
+        self.distance_traveled = 0 # in pixel
+        self.rect.center = (-300,-300) # avoid blinking image in topleft corner
+        if self.angle != 0:
+            self.set_angle(self.angle)
+
+    def _overwrite_parameters(self):
+        """change parameters before create_image is called"""
+        pass
+
+    def _default_parameters(self, **kwargs):
+        """get unlimited named arguments and turn them into attributes
+           default values for missing keywords"""
+
+        for key, arg in kwargs.items():
+            setattr(self, key, arg)
+        if "layer" not in kwargs:
+            self._layer = 4
+        else:
+            self._layer = self.layer
+        #if "static" not in kwargs:
+        #    self.static = False
+        if "pos" not in kwargs:
+            self.pos = pygame.math.Vector2(150,150)
+        if "move" not in kwargs:
+            self.move = pygame.math.Vector2(0,0)
+        if "radius" not in kwargs:
+            self.radius = 5
+        if "width" not in kwargs:
+            self.width = self.radius * 2
+        if "height" not in kwargs:
+            self.height = self.radius * 2
+        if "color" not in kwargs:
+            #self.color = None
+            self.color = (random.randint(0,255), random.randint(0,255), random.randint(0,255))
+        #if "hitpoints" not in kwargs:
+        #    self.hitpoints = 100
+        #self.hitpointsfull = self.hitpoints # makes a copy
+        #if "mass" not in kwargs:
+        #    self.mass = 10
+        #if "damage" not in kwargs:
+        #    self.damage = 10
+        if "bounce_on_edge" not in kwargs:
+            self.bounce_on_edge = False
+        if "kill_on_edge" not in kwargs:
+            self.kill_on_edge = False
+        if "warp_on_edge" not in kwargs:
+            self.warp_on_edge = False
+        if "angle" not in kwargs:
+            self.angle = 0 # facing right?
+        if "max_age" not in kwargs:
+            self.max_age = None
+        if "max_distance" not in kwargs:
+            self.max_distance = None
+        if "picture" not in kwargs:
+            self.picture = None
+        if "bossnumber" not in kwargs:
+            self.bossnumber = None
+        if "kill_with_boss" not in kwargs:
+            self.kill_with_boss = False
+        if "sticky_with_boss" not in kwargs:
+            self.sticky_with_boss = False
+        if "speed" not in kwargs:
+            self.speed = None
+        if "age" not in kwargs:
+            self.age = 0 # age in seconds
+
+    def kill(self):
+        if self.number in self.numbers:
+           del VectorSprite.numbers[self.number] # remove Sprite from numbers dict
+        pygame.sprite.Sprite.kill(self)
+
+    def create_image(self):
+        if self.picture is not None:
+            self.image = self.picture.copy()
+        else:
+            self.image = pygame.Surface((self.width,self.height))
+            self.image.fill((self.color))
+        #self.image = self.image.convert_alpha()
+        self.image0 = self.image.copy()
+        self.rect= self.image.get_rect()
+        self.width = self.rect.width
+        self.height = self.rect.height
+
+    def rotate(self, by_degree):
+        """rotates a sprite and changes it's angle by by_degree"""
+        self.angle += by_degree
+        oldcenter = self.rect.center
+        self.image = pygame.transform.rotate(self.image0, self.angle)
+        self.image.convert_alpha()
+        self.rect = self.image.get_rect()
+        self.rect.center = oldcenter
+
+    def set_angle(self, degree):
+        """rotates a sprite and changes it's angle to degree"""
+        self.angle = degree
+        oldcenter = self.rect.center
+        self.image = pygame.transform.rotate(self.image0, self.angle)
+        self.image.convert_alpha()
+        self.rect = self.image.get_rect()
+        self.rect.center = oldcenter
+
+    def update(self, seconds):
+        """calculate movement, position and bouncing on edge"""
+        # position and move are pygame.math.Vector2 objects
+        # ----- kill because... ------
+        #if self.hitpoints <= 0:
+        #    self.kill()
+        if self.max_age is not None and self.age > self.max_age:
+            self.kill()
+        if self.max_distance is not None and self.distance_traveled > self.max_distance:
+            self.kill()
+        # ---- movement with/without boss ----
+        if self.bossnumber is not None:
+            if self.kill_with_boss:
+                if self.bossnumber not in VectorSprite.numbers:
+                    self.kill()
+            if self.sticky_with_boss:
+                boss = VectorSprite.numbers[self.bossnumber]
+                #self.pos = v.Vec2d(boss.pos.x, boss.pos.y)
+                self.pos = pygame.math.Vector2(boss.pos.x, boss.pos.y)
+        self.pos += self.move * seconds
+        self.distance_traveled += self.move.length() * seconds
+        self.age += seconds
+        self.wallbounce()
+        self.rect.center = ( round(self.pos.x, 0), round(self.pos.y, 0) )
+
+    def wallbounce(self):
+        # ---- bounce / kill on screen edge ----
+        # ------- left edge ----
+        if self.pos.x < 0:
+            if self.kill_on_edge:
+                self.kill()
+            elif self.bounce_on_edge:
+                self.pos.x = 0
+                self.move.x *= -1
+            elif self.warp_on_edge:
+                self.pos.x = Viewer.width
+        # -------- upper edge -----
+        if self.pos.y  < 0:
+            if self.kill_on_edge:
+                self.kill()
+            elif self.bounce_on_edge:
+                self.pos.y = 0
+                self.move.y *= -1
+            elif self.warp_on_edge:
+                self.pos.y = Viewer.height
+        # -------- right edge -----
+        if self.pos.x  > Viewer.width:
+            if self.kill_on_edge:
+                self.kill()
+            elif self.bounce_on_edge:
+                self.pos.x = Viewer.width
+                self.move.x *= -1
+            elif self.warp_on_edge:
+                self.pos.x = 0
+        # --------- lower edge ------------
+        if self.pos.y   > Viewer.height:
+            if self.kill_on_edge:
+                self.hitpoints = 0
+                self.kill()
+            elif self.bounce_on_edge:
+                self.pos.y = Viewer.height
+                self.move.y *= -1
+            elif self.warp_on_edge:
+                self.pos.y = 0
+
+class Flytext(VectorSprite):
+    def __init__(self, text, fontsize=22, acceleration_factor = 1.02, max_speed= 300, **kwargs ):
+        """a text flying upward and for a short time and disappearing"""
+
+        VectorSprite.__init__(self, **kwargs)
+        ##self._layer = 7  # order of sprite layers (before / behind other sprites)
+        ##pygame.sprite.Sprite.__init__(self, self.groups)  # THIS LINE IS IMPORTANT !!
+        self.text = text
+        self.acceleartion_factor = acceleration_factor
+        self.max_speed = max_speed
+        self.kill_on_edge = True
+        self.image = make_text(self.text, self.color, fontsize)[0]  # font 22
+        self.rect = self.image.get_rect()
+
+    def update(self, seconds):
+        self.move *= self.acceleartion_factor
+        if self.move.length() > self.max_speed:
+            self.move.normalize_ip()
+            self.move *= self.max_speed
+        VectorSprite.update(self, seconds)
+
+class ArrowSprite(VectorSprite):
+
+    pass
+
 
 class NaturalWeapon():
 
@@ -712,6 +918,33 @@ class Game():
                     del Game.objects[o.number]
 
 
+    def fire_arrow(self):
+        """fires an arrow from player to Cursor.
+           returns flightpath if sucessfull fired, otherwise return False)"""
+        # TODO: check if player has enouth arrows in his inventory
+        if Game.cursor_y == 0 and Game.cursor_x == 0:
+            Game.log.append("you must move the cursor with w,a,s,d before shooting with f")
+            return False
+        # check if line of tiles in arrow path
+        flightpath = get_line((self.player.x, self.player.y), (self.player.x+Game.cursor_x, self.player.y+Game.cursor_y))
+        #flightpath = flightpath[:] # remove first tile, because it is blocked by player
+        victim = None
+        for i, (x,y) in enumerate(flightpath):
+            #print(Game.dungeon[self.player.z][y][x]) # TODO: highlight flightpath with cursor movement ?
+            if Game.dungeon[self.player.z][y][x].block_flying:
+                flightpath = flightpath[:i]
+                break
+            # monster blocking path (except player)
+            for o in [o for o in Game.objects.values() if o.z == self.player.z and o.y == y and o.x == x and isinstance(o, Monster) and o != self.player]:
+                # TODO: arrow damage calculation
+                Game.log.append("You hit the {} with your arrow!".format(o.__class__.__name__))
+                o.hitpoints -= 10
+                # TODO: kill Monster if hitpoints <= 0!
+                return flightpath
+        return flightpath # for animation
+        #print("flightpath", flightpath)
+
+
 
     def checkfight(self, x, y, z):
         """wir gehen davon aus dass nur der player schaut (checkt) ob er in ein Monster läuft"""
@@ -1207,7 +1440,6 @@ class Cursor():
         self.image.set_colorkey((0, 0, 0))
         self.image.convert_alpha()
 
-
 class Viewer():
     width = 0  # screen x resolution in pixel
     height = 0  # screen y resolution in pixel
@@ -1223,6 +1455,8 @@ class Viewer():
         Viewer.grid_size = grid_size  # make global readable
         Viewer.width = width
         Viewer.height = height
+        self.random1 = random.randint(1, 1000) # necessary for Viewer.wall_and_floor_theme
+        self.random2 = random.randint(1, 1000)
         pygame.init()
         # player center in pixel
         self.pcx = (width - Viewer.panel_width) // 2  # set player in the middle of the screen
@@ -1259,7 +1493,23 @@ class Viewer():
         self.create_tiles()
         self.wall_and_floor_theme()
         self.cursor = Cursor()
+        self.prepare_spritegroups()
         self.run()
+
+    def prepare_spritegroups(self):
+        self.allgroup = pygame.sprite.LayeredUpdates()  # for drawing
+        self.flytextgroup = pygame.sprite.Group()
+
+        VectorSprite.groups = self.allgroup
+        Flytext.groups = self.allgroup, self.flytextgroup
+        ArrowSprite.groups = self.allgroup
+
+    def tile_to_pixel(self, x,y):
+        """get a tile coordinate and returns pixel coordinate"""
+        x2 =  self.pcx + (x - self.game.player.x) * Viewer.grid_size[0]
+        y2 =  self.pcy + (y - self.game.player.y) * Viewer.grid_size[1]
+        return x2, y2
+
 
     def load_images(self):
         """single images. char looks to the right by default?"""
@@ -1397,7 +1647,10 @@ class Viewer():
         self.scroll_tiles = (pygame.Surface.subsurface(main_img, (188, 412, 27, 28)),
                              pygame.Surface.subsurface(main_dark_img, (188, 412, 27, 28)))
 
-
+        # ------ sprites -----
+        # arrow looking right
+        self.arrow_tiles = ( pygame.Surface.subsurface(main_img, (808,224,22,7)),
+                             pygame.Surface.subsurface(main_dark_img, (808,224,22,7)))
 
 
 
@@ -1418,20 +1671,24 @@ class Viewer():
 
     def wall_and_floor_theme(self):
         """select a set of floor/walltiles, depending on level number (z)"""
-        # manipulate random seed so that each dungeon level always generate the same random tiles
-        random.seed(self.game.player.z)
+        # TODO: make one function out of this and call it twice
+        ## manipulate random seed so that each dungeon level always generate the same random tiles
+        ##random.seed(self.game.player.z)
         # ---------------------------- walls ----------------------
         # walls: all tiles 32x32, huge image is 1024x1280 x(topleft), y(topleft), how many elements to the right
-        walls = random.choice([(0, 0, 8),(256,0,8), (512,0,8), (768,0,8),
+        # create 2 very large integer numbers
+        a = self.game.player.z * self.random1
+        b = self.game.player.z * self.random2
+        walls = [(0, 0, 8),(256,0,8), (512,0,8), (768,0,8),
                  (0, 32, 8), (256, 32, 8), (512, 32, 8), (768, 32, 8),
                  (0, 64, 8), (256, 64, 8), (512, 64, 8), (768, 64, 8),
                  (0, 96, 8), (256, 96, 8), (512, 96, 8), (768, 96, 8),
                  (0, 128, 8), (256, 128, 8), (512, 128, 8), (768, 128, 8),
                  (0, 160, 8), (256, 160, 8), (512, 160, 8), (768, 160, 8),
                  (0, 192, 8), (256, 192, 8), (512, 192, 8), (768, 192, 4),
-                 ])
-
-        walls = (992,384,5)
+                 ]
+        walls = walls[a % len(walls)] # like random.choice, but with consistent result
+        #walls = (992,384,5)
 
         # ---- add single subimages to darkwalls and lightwalls---
         # x1,y1, x2,y2: 0,225, 32 , 256
@@ -1454,12 +1711,12 @@ class Viewer():
         # floor.png 1024x960, tiles are 32x32
         # floors: all32x32: x(topleft), y(topleft), how many elements
 
-        ##floors = (928,512,10)
-
-        floors = random.choice([(576, 0, 9),(128,32,9), (416,32,9), (704,32,9), (256,64,9), (544,64,9),
+        floors = [(576, 0, 9),(128,32,9), (416,32,9), (704,32,9), (256,64,9), (544,64,9),
                                 (96,96,9), (384,96,9), (672,96,9), (224,128,9), (512,128,9),(64,160,4),
                                 (192,160,4), (320,160,4) , (448,160,9),
-                               ])
+                               ]
+        floors = floors[b % len(floors)] # like random.choice, but consistent
+        ##floors = (928,512,10)
         myfloors = []
         for i in range(floors[2]):
             x = floors[0] + i * 32
@@ -1675,6 +1932,7 @@ class Viewer():
         # - y95 ------
 
         tilex, tiley = self.game.player.x + Game.cursor_x, self.game.player.y + Game.cursor_y
+        ##print("cursor is at ", tilex, tiley, "=", self.tile_to_pixel(tilex, tiley))
         t = Game.dungeon[self.game.player.z][tiley][tilex]
         write(self.panelscreen, text="x:{} y:{} turn:{}".format(tilex, tiley, self.game.turn), x=5, y=95, color=(255, 255, 255),
               font_size=16)
@@ -1749,31 +2007,11 @@ class Viewer():
         self.redraw = True
         #self.redraw = True
 
-    def play_animation(self, animation):
-        # --- draw laser beam -----
-        c = (0, 0, random.randint(10, 250))
-        w = random.randint(1, 4)
-        d = 8  # distance from corner of grid toward center for laser start points
-        startpoints = [(d, d),
-                       (self.grid_size[0] - d, d),
-                       (d, self.grid_size[1] - d),
-                       (self.grid_size[0] - d, self.grid_size[1] - d)]
-        lasertarget = (Game.cursor_x, Game.cursor_y)
-        for x, y in startpoints:
-            pygame.draw.line(self.screen, c,
-                             (self.pcx + x, self.pcy + y),
-                             (self.pcx + self.grid_size[0] // 2 + lasertarget[0] * self.grid_size[0],
-                              self.pcy + self.grid_size[1] // 2 + lasertarget[1] * self.grid_size[1]),
-                             w)
-
-        pygame.display.flip()
-        self.screen.blit(self.background, (0, 0))
-        # --- order of drawing (back to front) ---
-        self.draw_dungeon()
-        self.draw_radar()
-        self.draw_panel()
-        self.draw_log()
-        #continue
+    def animate_sprites_only(self, seconds):
+        self.allgroup.clear(self.screen, self.spriteless_background)
+        self.allgroup.update(seconds)
+        self.allgroup.draw(self.screen)
+        pygame.display.update()
 
     def run(self):
         """The mainloop"""
@@ -1783,9 +2021,9 @@ class Viewer():
         self.game.make_fov_map()
         self.redraw = True
         # exittime = 0
-
+        self.spriteless_background = pygame.Surface((Viewer.width, Viewer.height))
         show_range = False
-        animation = 0
+        animation = 0 # how many seconds animation should be played until the game accept inputs, new turn etc again
         reset_cursor = True
         log_lines = len(Game.log)
         while running:
@@ -1796,25 +2034,20 @@ class Viewer():
             milliseconds = self.clock.tick(self.fps)  #
             seconds = milliseconds / 1000
             # --- redraw whole screen if animation has ended ----
-            if animation > self.playtime and animation < (self.playtime + seconds):
-                self.redraw = True
+            #if animation > self.playtime and animation < (self.playtime + seconds):
+            #    self.redraw = True
 
             self.playtime += seconds
 
             # ---------animation -------
             if animation > self.playtime:
-                self.play_animation(animation)
+                self.animate_sprites_only(seconds)
                 continue # ignore rest of main loop
 
             # ----------- End of animation --------------
             # ------------ pressed keys (in this moment pressed down)------
             pressed_keys = pygame.key.get_pressed()
-            #if pressed_keys[pygame.K_LSHIFT]:
-            #    show_range = True
-            #else:
-            #    show_range = False
 
-            # self.oldscreen = self.screen
             # -------- events ------
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -1859,9 +2092,8 @@ class Viewer():
 
                     # ---- shoot laser beam to cursor -----
                     if event.key == pygame.K_1:
-                        # laser = 1
-
-                        animation = self.playtime + 1
+                        # play animation only for 2 seconds
+                        animation = self.playtime + 2
                     # ---- -simple player movement with cursor keys -------
                     if event.key in ( pygame.K_RIGHT, pygame.K_KP6 ) :
                         self.new_turn()
@@ -1910,6 +2142,34 @@ class Viewer():
                                 self.game.player.hitpoints += 1
 
                         self.redraw = True
+
+                    if event.key == pygame.K_x:
+                        Flytext(text="Hallo Horst", pos=pygame.math.Vector2(300,300), move=pygame.math.Vector2(0,-10), max_age=15)
+
+                    if event.key == pygame.K_f:
+                        # fire arrow to cursor
+                        path =  self.game.fire_arrow()
+                        if path:
+
+                            speed = 150 # pixel / second
+                            # arrow was sucessfully fired
+                            target = self.tile_to_pixel(path[-1][0], path[-1][1]) # destination coordinate in pixel
+                            movevector = pygame.math.Vector2((target[0]-self.pcx), (target[1]-self.pcy))
+                            #print("movevector", mfdd)
+                            distance = movevector.length()
+                            movevector.normalize_ip() # reduce to lenght 1
+                            movevector *= speed   #
+                            self.animation = self.playtime + distance / speed  # arrow flies 10 tiles per second
+                            #print("animation duration:", self.animation- self.playtime)
+                            # arrow shall start in the middle of tile, not in the topleft corner
+                            startpos = pygame.math.Vector2(self.pcx+ Viewer.grid_size[0]//2, self.pcy+Viewer.grid_size[1]//2)
+                            image = pygame.transform.rotate(self.arrow_tiles[0], movevector.angle_to(pygame.math.Vector2(1,0)))
+
+                            ArrowSprite(pos=startpos, move=movevector, max_distance = distance, picture=image)
+                            self.animate_sprites_only(seconds)
+                            self.new_turn()
+
+
                     if event.key in ( pygame.K_LESS, pygame.K_GREATER) :
                         self.new_turn()
                         # go up a level
@@ -1942,7 +2202,15 @@ class Viewer():
                         self.redraw = True
 
             # ============== draw screen =================
-            dirtyrects = []
+            #screen_without_sprites = self.screen.copy()
+            #self.allgroup.clear(bgd=self.screen)
+            self.allgroup.clear(self.screen, self.spriteless_background )
+
+            self.allgroup.update(seconds)
+
+            #dirtyrects = []
+            dirtyrects =  self.allgroup.draw(self.screen)
+
             if self.redraw:
 
                 if reset_cursor:
@@ -1957,6 +2225,7 @@ class Viewer():
                 dirtyrects.append((0, 0, Viewer.width, Viewer.height))
                 # self.draw_panel()
                 self.draw_log()
+                self.spriteless_background.blit(self.screen, (0,0))
 
             elif len(Game.log) > log_lines:
                 self.draw_log()   # always draw log
@@ -1988,19 +2257,15 @@ class Viewer():
             write(self.screen, text=fps_text, origin="bottomright", x=Viewer.width - 2, y=Viewer.height - 2,
                   font_size=16, bold=True, color=(0, 0, 0))
 
-            #if show_range:
-            #    pygame.draw.circle(self.screen, (200, 0, 0),
-            #                       (self.pcx, self.pcy),
-            #                       Game.torch_radius * self.grid_size[0], 1)
-            # ------ Cursor -----
 
+            # ------ Cursor -----
+            # is NOT a sprite!
             if Game.cursor_y != 0 or Game.cursor_x != 0: # only blit cursor if outside player
                 self.cursor.create_image()
                 self.screen.blit(self.cursor.image, (
                     self.pcx + Game.cursor_x * self.grid_size[0],
                     self.pcy + Game.cursor_y * self.grid_size[1]))
             # -------- next frame -------------
-            #pygame.display.flip() # use update(rectlist) instead
             pygame.display.update(dirtyrects)
         # -----------------------------------------------------
         pygame.mouse.set_visible(True)
