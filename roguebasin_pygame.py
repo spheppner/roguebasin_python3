@@ -1038,7 +1038,6 @@ class Game():
     def player_arrow(self):
         """fires an arrow from player to Cursor.
            returns start, end, victim"""
-        # TODO: check if player has enough arrows in his inventory
         if self.player.arrows < 1:
             Game.log.append("you must find/buy some arrows before you can shoot them")
             return None, None, None
@@ -1355,7 +1354,14 @@ class Game():
 
     def place_loot(self, z):
         """each floor tile has a small chance to spawn loot"""
-        pass
+        for y, line in enumerate(Game.dungeon[z]):
+            for x, tile in enumerate(line):
+                if tile.char == ".":
+                    if random.random() < 0.01:
+                        if random.random() < 0.5:
+                            Gold(x,y,z)
+                        else:
+                            Arrows(x,y,z)
 
     def use_stairs(self):
         """go up or done one dungeon level, depending on stair"""
