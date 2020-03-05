@@ -714,6 +714,13 @@ class Gold(Item):
         self.char = "*"
         self.value = random.randint(1, 100)
 
+class Arrows(Item):
+
+    def _overwrite(self):
+        super()._overwrite()
+        self.color = (14,55,15)
+        self.char = "a"
+        self.quantity = random.randint(1, 33)
 
 class Shop(Object):
     """a shop to trade items"""
@@ -798,6 +805,7 @@ class Wolf(Monster):
     def _overwrite(self):
         super()._overwrite()
         self.char = "W"
+        self.level = 1
         self.aggro = 5
         self.hitpoints = 30
         self.attack = (2, 6)
@@ -814,6 +822,7 @@ class Snake(Monster):
         super()._overwrite()
         self.char = "S"
         self.aggro = 2
+        self.level = 1
         self.hitpoints = 20
         self.attack = (2, 4)
         self.defense = (3, 3)
@@ -828,6 +837,7 @@ class Yeti(Monster):
         super()._overwrite()
         self.char = "Y"
         self.aggro = 4
+        self.level = 2
         self.hitpoints = 20
         self.attack = (8, 2)
         self.defense = (4, 3)
@@ -842,6 +852,7 @@ class Dragon(Monster):
         super()._overwrite()
         self.char = "D"
         self.aggro = 6
+        self.level = 3
         self.immobile = True
         self.shoot_arrows = True
         self.arrow_range = random.randint(10, 15)
@@ -869,6 +880,7 @@ class Player(Monster):
         self.scrolls = {}
         self.scroll_list = []
         self.victims = {}
+        self.arrows = 5
         self.image_name = "arch-mage"
         self.sniffrange_monster = 4
         self.sniffrange_items = 6
@@ -919,6 +931,7 @@ class Game():
         Game.cursor_y = self.player.y
         # Monster(2,2,0)
         Wolf(2, 2, 0)
+        #Yeti(2,2,0)
         Snake(3, 3, 0)
         Yeti(4, 4, 0)
         Dragon(33, 6, 0)
@@ -930,6 +943,8 @@ class Game():
             Scroll(4, 4, 0)
             Scroll(5, 4, 0)
             Scroll(4, 6, 0)
+
+        self.levelmonsters = [Snake,Wolf, Yeti, Dragon ]
         # Scroll(4, 5, 0)
         self.log.append("Welcome to the first dungeon level (level 0)!")
         self.log.append("Use cursor keys to move around")
@@ -939,9 +954,14 @@ class Game():
         # TODO join create_empty_dungeon_level mit create_rooms_tunnels
         self.create_empty_dungeon_level(tiles_x, tiles_y, filled=True, z=1)  # dungoen is full of walls,
         # carve out some rooms and tunnels in this new dungeon level
-        self.create_rooms_and_tunnels(z=1)  # carve out some random rooms and tunnels
+        self.rooms = []
         # append empty dungeon level
+        self.create_rooms_and_tunnels(z=1)  # carve out some random rooms and tunnels -> self.rooms
+        self.place_monsters(z=1)
+        self.place_loot(z=1)
+
         self.turn = 1
+
 
     def new_turn(self):
         self.turn += 1
@@ -968,6 +988,11 @@ class Game():
                     Game.log.append("You found {} gold!".format(o.value))
                     self.player.gold += o.value
                     # kill gold from dungeon
+                    del Game.objects[o.number]
+
+                elif isinstance(o, Arrows):
+                    Game.log.append("You found {} arrows!".format(o.quantity))
+                    self.player.arrows += o.quantity
                     del Game.objects[o.number]
 
                 elif isinstance(o, Scroll):
@@ -1148,24 +1173,24 @@ class Game():
 
         if spell == "blink":
             # teleport to cursor position TODO: check for wall and illegal landing tiles
-            target_tile = Game.dungeon[self.player.z][self.player.y + Game.cursor_y][self.player.x + Game.cursor_x]
+            target_tile = Game.dungeon[self.player.z][Game.cursor_y][Game.cursor_x]
             if not target_tile.explored:
                 Game.log.append("You can not blink on a unexplored tile.")
                 return False
             if target_tile.block_movement:
                 Game.log.append("You can not blink to this tile.")
                 return False
-            if not Game.fov_map[self.player.y + Game.cursor_y][self.player.x + Game.cursor_x]:
+            if not Game.fov_map[Game.cursor_y][Game.cursor_x]:
                 Game.log.append("You can not blink on a tile outside your field of view")
                 return False
             for o in Game.objects.values():
-                if (o.z == self.player.z and o.y == self.player.y + Game.cursor_y and
-                        o.x == self.player.x + Game.cursor_x and o != self.player and
+                if (o.z == self.player.z and o.y == Game.cursor_y and
+                        o.x ==  Game.cursor_x and o != self.player and
                         isinstance(o, Monster) and o.hitpoints > 0):
                     Game.log.append("You can not blink on top of a monster")
                     return False
 
-            self.move_player(Game.cursor_x, Game.cursor_y)
+            self.move_player(Game.cursor_x-self.player.x, Game.cursor_y-self.player.y)
             self.player.scrolls["blink"] -= 1
             self.player.calculate_scroll_list()
             return True
@@ -1291,11 +1316,39 @@ class Game():
                 continue
             Stair(x, y, z, char=">")
             num_stairs += 1
+
+        # --- copy local rooms to self.rooms ---
+        self.rooms =  rooms
+
         # -------------create monsters in rooms ------------------
         # print("rooms", rooms)
-        for r in rooms:
-            if random.random() < 0.66:
-                Wolf(random.randint(r.x1 + 1, r.x2 - 1), random.randint(r.y1 + 1, r.y2 - 1), z)
+        #for r in rooms:
+        #    if random.random() < 0.66:
+        #        Wolf(random.randint(r.x1 + 1, r.x2 - 1), random.randint(r.y1 + 1, r.y2 - 1), z)
+
+
+    def place_monsters(self, z):
+        """place a random monster inside a room
+        mayme more than one. maybe even 2 on the same tile
+        depending on levelmonsters
+        (in level 1 only snakes, in level 2 snakes or wolfes etc)
+        """
+        # TODO: better code to avoid 2 monsters spawn on same tile
+        for room in self.rooms:
+            #print("processing room", room)
+            #x1, y1, x2, y2 = room
+            # 10% chance for 0 monster in this room
+            # 70% chance for 1 monster, 15% for 2, 5% for 3
+            for _ in range(randomizer([0.1, 0.7,0.15,0.05])):
+                mo = random.choice(self.levelmonsters[:z]) # if z > len(levelmonsters), take any monster
+                x = random.randint(room.x1, room.x2)
+                y = random.randint(room.y1, room.y2)
+                mo(x,y,z)
+
+
+    def place_loot(self, z):
+        """each floor tile has a small chance to spawn loot"""
+        pass
 
     def use_stairs(self):
         """go up or done one dungeon level, depending on stair"""
@@ -1331,10 +1384,13 @@ class Game():
         try:
             l = Game.dungeon[self.player.z + 1]
         except:
+            z_new = self.player.z + 1
             Game.log.append("please wait a bit, i must create this level...")
             self.create_empty_dungeon_level(Game.tiles_x, Game.tiles_y,
-                                            z=self.player.z + 1)
-            self.create_rooms_and_tunnels(z=self.player.z + 1)
+                                            z=z_new)
+            self.create_rooms_and_tunnels(z=z_new)
+            self.place_monsters(z=z_new)
+            self.place_loot(z=z_new)
         self.player.z += 1
         self.make_fov_map()
         self.player_has_new_position()
@@ -1611,13 +1667,13 @@ class Viewer():
         level_height = len(Game.dungeon[self.game.player.z])
         #print("level dimension in tiles:", level_width, level_height, Game.cursor_x, Game.cursor_y, dx, dy)
         if target_x < 0 or target_y < 0 or target_x >= level_width or target_y >= level_height:
-            print("mouse outside level tiles", x, y)
+            #print("mouse outside level tiles", x, y)
             return  # cursor can not move outside of the current level
         # check if the target tile is outside the current game window
         x = self.pcx + x * self.grid_size[0]
         y = self.pcy + y * self.grid_size[1]
         if x < 0 or y < 0 or x > (self.width - self.panel_width) or y > (self.height - self.log_height):
-            print("mouse outside game panel", x, y)
+            #print("mouse outside game panel", x, y)
             return  # cursor can not move outside of the game window
         #
         # ---- finally, move the cursor ---
@@ -1723,7 +1779,8 @@ class Viewer():
                            pygame.Surface.subsurface(main_dark_img, (207, 655, 26, 20)))
         self.scroll_tiles = (pygame.Surface.subsurface(main_img, (188, 412, 27, 28)),
                              pygame.Surface.subsurface(main_dark_img, (188, 412, 27, 28)))
-
+        self.arrow_tiles = (pygame.Surface.subsurface(main_img, (681, 224, 27, 16)),
+                           pygame.Surface.subsurface(main_dark_img, (681, 224, 27, 16)))
         # ------ sprites -----
         # arrow looking right, only used for Sprite Animation (arrow on the ground has different picture)
         ArrowSprite.image = pygame.Surface.subsurface(main_img, (808, 224, 22, 7))
@@ -1742,6 +1799,7 @@ class Viewer():
                        "Y": self.yeti_tiles,
                        "D": self.dragon_tiles,
                        "*": self.gold_tiles,
+                       "a": self.arrow_tiles,
                        "i": self.scroll_tiles,
 
                        }  # rest of legend in wall_and_floor_theme
@@ -2048,7 +2106,10 @@ class Viewer():
         for h in hints:
             write(self.panelscreen, text=h, x=5, y=y, color=(0, 0, 0), font_size=10)
             y += 20
-
+        # ---- arrows -----
+        write(self.panelscreen, text="Arrows (f): {}".format(self.game.player.arrows),
+              x=5, y=y, color=(255,255,255), font_size=14)
+        y += 20
         # ---- magic scrolls -----
         if len(self.game.player.scrolls) > 0:
             write(self.panelscreen, text="Magic: use CTRL+", color=(80, 0, 80),
