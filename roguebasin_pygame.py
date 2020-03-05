@@ -1039,9 +1039,13 @@ class Game():
         """fires an arrow from player to Cursor.
            returns start, end, victim"""
         # TODO: check if player has enough arrows in his inventory
+        if self.player.arrows < 1:
+            Game.log.append("you must find/buy some arrows before you can shoot them")
+            return None, None, None
         if Game.cursor_y == self.player.y and Game.cursor_x == self.player.x:
             Game.log.append("you must move the cursor with mouse before shooting with f")
             return None, None, None  # start, end, victim
+        self.player.arrows -= 1
         return self.other_arrow((self.player.x, self.player.y),
                                 (Game.cursor_x, Game.cursor_y))
 
@@ -1215,6 +1219,9 @@ class Game():
                 if char == "$":
                     row.append(Tile("."))
                     Shop(x, y, z, char)
+                if char == "a":
+                    row.append(Tile("."))
+                    Arrows(x,y,z,char)
                 if char == "*":
                     row.append(Tile("."))
                     Gold(x, y, z, char)
