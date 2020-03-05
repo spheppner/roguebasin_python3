@@ -8,7 +8,8 @@ download:
 based on: http://www.roguebasin.com/index.php?title=Complete_Roguelike_Tutorial,_using_python%2Blibtcod,_part_4
 
 field of view and exploration
-also see http://www.roguebasin.com/index.php?title=Comparative_study_of_field_of_view_algorithms_for_2D_grid_based_worlds
+also
+see http://www.roguebasin.com/index.php?title=Comparative_study_of_field_of_view_algorithms_for_2D_grid_based_worlds
 
 field of view improving, removing of artifacts:
 https://sites.google.com/site/jicenospam/visibilitydetermination
@@ -24,30 +25,28 @@ import os
 ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 
-
-# TODO monster speed > 1 tile possible ?
-
-# TODO rework NaturalWeapon
-# TODO Item
-# TODO Equipment
-# TODO Consumable
+#  TODO monster speed > 1 tile possible ?
+#  TODO rework NaturalWeapon
+#  TODO Item
+#  TODO Equipment
+#  TODO Consumable
 
 
 class VectorSprite(pygame.sprite.Sprite):
     """base class for sprites. this class inherits from pygames sprite class"""
     number = 0
-    numbers = {} # { number, Sprite }
+    numbers = {}  # { number, Sprite }
 
     def __init__(self, **kwargs):
         self._default_parameters(**kwargs)
         self._overwrite_parameters()
-        pygame.sprite.Sprite.__init__(self, self.groups) #call parent class. NEVER FORGET !
-        self.number = VectorSprite.number # unique number for each sprite
+        pygame.sprite.Sprite.__init__(self, self.groups)  # call parent class. NEVER FORGET !
+        self.number = VectorSprite.number  # unique number for each sprite
         VectorSprite.number += 1
         VectorSprite.numbers[self.number] = self
         self.create_image()
-        self.distance_traveled = 0 # in pixel
-        self.rect.center = (-300,-300) # avoid blinking image in topleft corner
+        self.distance_traveled = 0  # in pixel
+        self.rect.center = (-300, -300)  # avoid blinking image in topleft corner
         if self.angle != 0:
             self.set_angle(self.angle)
 
@@ -65,12 +64,12 @@ class VectorSprite(pygame.sprite.Sprite):
             self._layer = 4
         else:
             self._layer = self.layer
-        #if "static" not in kwargs:
+        # if "static" not in kwargs:
         #    self.static = False
         if "pos" not in kwargs:
-            self.pos = pygame.math.Vector2(150,150)
+            self.pos = pygame.math.Vector2(150, 150)
         if "move" not in kwargs:
-            self.move = pygame.math.Vector2(0,0)
+            self.move = pygame.math.Vector2(0, 0)
         if "radius" not in kwargs:
             self.radius = 5
         if "width" not in kwargs:
@@ -78,14 +77,14 @@ class VectorSprite(pygame.sprite.Sprite):
         if "height" not in kwargs:
             self.height = self.radius * 2
         if "color" not in kwargs:
-            #self.color = None
-            self.color = (random.randint(0,255), random.randint(0,255), random.randint(0,255))
-        #if "hitpoints" not in kwargs:
+            # self.color = None
+            self.color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        # if "hitpoints" not in kwargs:
         #    self.hitpoints = 100
-        #self.hitpointsfull = self.hitpoints # makes a copy
-        #if "mass" not in kwargs:
+        # self.hitpointsfull = self.hitpoints # makes a copy
+        # if "mass" not in kwargs:
         #    self.mass = 10
-        #if "damage" not in kwargs:
+        # if "damage" not in kwargs:
         #    self.damage = 10
         if "bounce_on_edge" not in kwargs:
             self.bounce_on_edge = False
@@ -94,7 +93,7 @@ class VectorSprite(pygame.sprite.Sprite):
         if "warp_on_edge" not in kwargs:
             self.warp_on_edge = False
         if "angle" not in kwargs:
-            self.angle = 0 # facing right?
+            self.angle = 0  # facing right?
         if "max_age" not in kwargs:
             self.max_age = None
         if "max_distance" not in kwargs:
@@ -110,22 +109,22 @@ class VectorSprite(pygame.sprite.Sprite):
         if "speed" not in kwargs:
             self.speed = None
         if "age" not in kwargs:
-            self.age = 0 # age in seconds
+            self.age = 0  # age in seconds
 
     def kill(self):
         if self.number in self.numbers:
-           del VectorSprite.numbers[self.number] # remove Sprite from numbers dict
+            del VectorSprite.numbers[self.number]  # remove Sprite from numbers dict
         pygame.sprite.Sprite.kill(self)
 
     def create_image(self):
         if self.picture is not None:
             self.image = self.picture.copy()
         else:
-            self.image = pygame.Surface((self.width,self.height))
+            self.image = pygame.Surface((self.width, self.height))
             self.image.fill((self.color))
-        #self.image = self.image.convert_alpha()
+        # self.image = self.image.convert_alpha()
         self.image0 = self.image.copy()
-        self.rect= self.image.get_rect()
+        self.rect = self.image.get_rect()
         self.width = self.rect.width
         self.height = self.rect.height
 
@@ -151,7 +150,7 @@ class VectorSprite(pygame.sprite.Sprite):
         """calculate movement, position and bouncing on edge"""
         # position and move are pygame.math.Vector2 objects
         # ----- kill because... ------
-        #if self.hitpoints <= 0:
+        # if self.hitpoints <= 0:
         #    self.kill()
         if self.max_age is not None and self.age > self.max_age:
             self.kill()
@@ -164,13 +163,13 @@ class VectorSprite(pygame.sprite.Sprite):
                     self.kill()
             if self.sticky_with_boss:
                 boss = VectorSprite.numbers[self.bossnumber]
-                #self.pos = v.Vec2d(boss.pos.x, boss.pos.y)
+                # self.pos = v.Vec2d(boss.pos.x, boss.pos.y)
                 self.pos = pygame.math.Vector2(boss.pos.x, boss.pos.y)
         self.pos += self.move * seconds
         self.distance_traveled += self.move.length() * seconds
         self.age += seconds
         self.wallbounce()
-        self.rect.center = ( round(self.pos.x, 0), round(self.pos.y, 0) )
+        self.rect.center = (round(self.pos.x, 0), round(self.pos.y, 0))
 
     def wallbounce(self):
         # ---- bounce / kill on screen edge ----
@@ -184,7 +183,7 @@ class VectorSprite(pygame.sprite.Sprite):
             elif self.warp_on_edge:
                 self.pos.x = Viewer.width
         # -------- upper edge -----
-        if self.pos.y  < 0:
+        if self.pos.y < 0:
             if self.kill_on_edge:
                 self.kill()
             elif self.bounce_on_edge:
@@ -193,7 +192,7 @@ class VectorSprite(pygame.sprite.Sprite):
             elif self.warp_on_edge:
                 self.pos.y = Viewer.height
         # -------- right edge -----
-        if self.pos.x  > Viewer.width:
+        if self.pos.x > Viewer.width:
             if self.kill_on_edge:
                 self.kill()
             elif self.bounce_on_edge:
@@ -202,7 +201,7 @@ class VectorSprite(pygame.sprite.Sprite):
             elif self.warp_on_edge:
                 self.pos.x = 0
         # --------- lower edge ------------
-        if self.pos.y   > Viewer.height:
+        if self.pos.y > Viewer.height:
             if self.kill_on_edge:
                 self.hitpoints = 0
                 self.kill()
@@ -212,8 +211,10 @@ class VectorSprite(pygame.sprite.Sprite):
             elif self.warp_on_edge:
                 self.pos.y = 0
 
+
+
 class Flytext(VectorSprite):
-    def __init__(self, text, fontsize=22, acceleration_factor = 1.02, max_speed= 300, **kwargs ):
+    def __init__(self, text, fontsize=22, acceleration_factor=1.02, max_speed=300, **kwargs):
         """a text flying upward and for a short time and disappearing"""
 
         VectorSprite.__init__(self, **kwargs)
@@ -233,9 +234,34 @@ class Flytext(VectorSprite):
             self.move *= self.max_speed
         VectorSprite.update(self, seconds)
 
-class ArrowSprite(VectorSprite):
 
-    pass
+class ArrowSprite(VectorSprite):
+    """ a sprite flying from startpos to endpos with fixed speed
+        startpos and endpos are in pixel
+    """
+    image = None
+
+    def _overwrite_parameters(self):
+        super()._overwrite_parameters()  # empty
+        self.speed = 150  # pixel / second
+        self.move = pygame.math.Vector2(self.endpos[0] - self.startpos[0], self.endpos[1] - self.startpos[1])
+        self.picture = ArrowSprite.image
+        self.create_image()
+        distance = self.max_distance = self.move.length()
+        if distance > 0:
+            self.move.normalize_ip()  # reduce to lenght 1
+        else:
+            self.max_age = 0  # kill this arrow as soon as possible
+        self.move *= self.speed  #
+        self.duration = distance / self.speed  # in seconds
+        # arrow shall start in the middle of tile, not in the topleft corner
+        self.pos = pygame.math.Vector2(self.startpos[0] + Viewer.grid_size[0] // 2,
+                                       self.startpos[1] + Viewer.grid_size[1] // 2)
+        # self.image = pygame.transform.rotate(self.image,
+        #                                self.move.angle_to(pygame.math.Vector2(1, 0)))
+        # self.image.convert_alpha()
+        ## WEITERMACHEN SETANGLE ? (pfeil schaut derzeit nur nach rechts)
+        self.set_angle(self.move.angle_to(pygame.math.Vector2(1, 0)))
 
 
 class NaturalWeapon():
@@ -343,21 +369,20 @@ def megaroll(dicestring="1d6 1d20", bonus=0):
     for code in dlist:
         print("---processing", code)
         if "d" in code:
-            #reroll = False
+            # reroll = False
             rolls = int(code.split("d")[0])
             sides = int(code.split("d")[1])
             total += roll((rolls, sides), bonus=0, reroll=False)
         elif "D" in code:
-            #reroll = True
+            # reroll = True
             rolls = int(code.split("D")[0])
             sides = int(code.split("D")[1])
             total += roll((rolls, sides), bonus=0, reroll=True)
         else:
             raise SystemError("unknow dice type: {} use 1d6, 1D20 etc".format(code))
         print("---result of", code, "is :", str(total))
-    print("adding "+str(bonus)+"=", str(total+bonus))
-    return total+bonus
-
+    print("adding " + str(bonus) + "=", str(total + bonus))
+    return total + bonus
 
 
 def roll(dice, bonus=0, reroll=True):
@@ -367,7 +392,7 @@ def roll(dice, bonus=0, reroll=True):
        another roll is added, until a not-hightest number is rolled.
        e.g. 1D6 throws a 6, and re-rolls a 2 -> (6-1)+2= 7"""
     # TODO format-micro-language for aligning the numbers better
-    #TODO: accepting string of several dice, like '2D6 3d4' where 'd' means no re-roll, 'D' means re-roll
+    # TODO: accepting string of several dice, like '2D6 3d4' where 'd' means no re-roll, 'D' means re-roll
     rolls = dice[0]
     sides = dice[1]
     total = 0
@@ -376,7 +401,7 @@ def roll(dice, bonus=0, reroll=True):
     print("------------------------")
     i = 0
     verb = "rolls   "
-    #for d in range(rolls):
+    # for d in range(rolls):
     while True:
         i += 1
         if i > rolls:
@@ -385,7 +410,7 @@ def roll(dice, bonus=0, reroll=True):
 
         if reroll and value == sides:
             total += value - 1
-            print("die #{} {} {}  ∑: {} (count as {} and rolls again)".format(i, verb, value, total, value-1 ))
+            print("die #{} {} {}  ∑: {} (count as {} and rolls again)".format(i, verb, value, total, value - 1))
             verb = "re-rolls"
             i -= 1
             continue
@@ -408,7 +433,8 @@ def minmax(value, lower_limit=-1, upper_limit=1):
     value = min(upper_limit, value)
     return value
 
-def randomizer(list_of_chances=[1]):
+
+def randomizer(list_of_chances=[1.0,]):
     """gives back an integer depending on chance.
        e.g. randomizer((.75, 0.15, 0.05, 0.05)) gives in 75% 0, in 15% 1, and in 5% 2 or 3"""
     total = sum(list_of_chances)
@@ -533,7 +559,7 @@ def get_line(start, end):
     return points
 
 
-class Rect():
+class Rect:
     """a rectangle object (room) for the dungeon
        x,y is the topleft coordinate
     """
@@ -570,23 +596,23 @@ class Tile():
         # Tile.number += 1 # each tile instance has a unique number
         # generate a number that is mostly 0,but very seldom 1 and very rarely 2 or 3
         # see randomizer
-        self.decoration = randomizer((.30, 0.15, 0.15, 0.15, 0.1, 0.1,0.025, 0.025 )) # 8
+        self.decoration = randomizer((.30, 0.15, 0.15, 0.15, 0.1, 0.1, 0.025, 0.025))  # 8
         self.char = char
         self.block_movement = block_movement
         self.block_sight = block_sight
         self.block_flying = block_flying
         self.explored = explored
         # graphic_index is a random number to choose one of several graphical tiles
-        #self.graphic_index = random.randint(1, 4)
+        # self.graphic_index = random.randint(1, 4)
         # --- some common tiles ---
         if char == "#":  # wall
             self.block_movement = True
             self.block_flying = True
             self.block_sight = True
-            #self.i = random.randint(1, 10)
-            #self.decoration = randomizer((.55, 0.25, 0.15, 0.05))
+            # self.i = random.randint(1, 10)
+            # self.decoration = randomizer((.55, 0.25, 0.15, 0.05))
         elif char == ".":  # floor
-            self.decoration = randomizer((.15, 0.15, 0.15, 0.15, 0.15, 0.1, 0.1, 0.025, 0.025)) # 9
+            self.decoration = randomizer((.15, 0.15, 0.15, 0.15, 0.15, 0.1, 0.1, 0.025, 0.025))  # 9
             self.block_movement = False
             self.block_flying = False
             self.block_sight = False
@@ -608,7 +634,7 @@ class Object():
         self.x = x
         self.y = y
         self.z = z
-        self.hint = None # longer description and hint for panel
+        self.hint = None  # longer description and hint for panel
         self.image_name = None
         self.char = char
         self.color = color
@@ -628,18 +654,21 @@ class Object():
         if self.char not in Game.legend:
             Game.legend[self.char] = self.__class__.__name__
 
+    def kill(self):
+        # delete this object from Game.objects dictionary
+        del Game.objects[self.number]
 
     def _overwrite(self):
         pass
-
 
 
 class Item(Object):
     """an item that you can pick up"""
 
     def _overwrite(self):
-        self.color = (255,165,0) # orange
+        self.color = (255, 165, 0)  # orange
         self.weight = 0
+
 
 class Scroll(Item):
     """a scroll with a spell on it"""
@@ -650,27 +679,32 @@ class Scroll(Item):
         self.char = "i"
         self.hint = "consumable magic scroll "
         self.spell = random.choice(("blink", "blink", "fear", "fear", "bleed", "bleed",
-                                    "bleed", "magic map","magic map","magic map","magic map","magic map","magic map",
+                                    "bleed", "magic map", "magic map", "magic map", "magic map", "magic map",
+                                    "magic map",
                                     "magic missile", "magic missile", "magic missile",
                                     "fireball", "fireball", "fireball"))
         # disarm onfuse hurt bleed combat bless defense bless bull strenght dragon strenght superman
+
 
 class Gold(Item):
     """a heap of gold"""
 
     def _overwrite(self):
         super()._overwrite()
-        self.color = (200,200,0)
-        self.char="*"
-        self.value = random.randint(1,100)
+        self.color = (200, 200, 0)
+        self.char = "*"
+        self.value = random.randint(1, 100)
+
 
 class Shop(Object):
     """a shop to trade items"""
+
     def _overwrite(self):
-        self.color= ( 200,200,0)
+        self.color = (200, 200, 0)
         self.stay_visible_once_explored = True
         self.char = "$"
         self.hint = "press Space to buy hp"
+
 
 class Stair(Object):
     """a stair, going upwards < or downwards >"""
@@ -687,20 +721,26 @@ class Monster(Object):
     def _overwrite(self):
         self.aggro = 3
         self.char = "M"
+        self.immobile = False
+        self.shoot_arrows = False
+
         if self.color is None:
             self.color = (255, 255, 0)
 
     def ai(self, player):
         """returns dx, dy toward the player (if distance < aggro) or randomly"""
-        distance = ((self.x - player.x)**2 + (self.y-player.y)**2)**0.5
+        if self.immobile:
+            return 0, 0
+        distance = ((self.x - player.x) ** 2 + (self.y - player.y) ** 2) ** 0.5
+
         if distance < self.aggro:
             dx = player.x - self.x
             dy = player.y - self.y
             dx = minmax(dx, -1, 1)
             dy = minmax(dy, -1, 1)
         else:
-            dx = random.choice((-1,0,1))
-            dy = random.choice((-1,0,1))
+            dx = random.choice((-1, 0, 1))
+            dy = random.choice((-1, 0, 1))
         try:
             target = Game.dungeon[self.z][self.y + dy][self.x + dx]
         except:
@@ -712,7 +752,6 @@ class Monster(Object):
             return 0, 0
         print("dx dy", self.__class__.__name__, dx, dy)
         return dx, dy
-
 
     def move(self, dx, dy, dz=0):
         if dx > 0:
@@ -750,7 +789,6 @@ class Wolf(Monster):
         self.image_name = "direwolf"
 
 
-
 class Snake(Monster):
 
     def _overwrite(self):
@@ -785,6 +823,9 @@ class Dragon(Monster):
         super()._overwrite()
         self.char = "D"
         self.aggro = 6
+        self.immobile = True
+        self.shoot_arrows = True
+        self.arrow_range = random.randint(10, 15)
         self.hitpoints = 50
         self.attack = (6, 3)
         self.defense = (6, 3)
@@ -819,21 +860,20 @@ class Player(Monster):
         result = []
         for i, spell in enumerate(self.scrolls):
             result.append((ALPHABET[i], spell, self.scrolls[spell]))
-        self.scroll_list  =  result
+        self.scroll_list = result
 
     def spell_from_key(self, key):
-        for i, spell, number in  self.scroll_list:
+        for i, spell, number in self.scroll_list:
             if i == key and number > 0:
                 return spell
         return None
-
 
 
 class Game():
     dungeon = []  # list of list of list. 3D map representation, using text chars. z,y,x ! z=0: first level. z=1: second level etc
     fov_map = []  # field of vie map, only for current level!
     objects = {}  # container for all Object instances in this dungeon
-    #legend = {} # fills itself because of class Object's __init__ method
+    # legend = {} # fills itself because of class Object's __init__ method
     legend = {"@": "player",
               "#": "wall tile",
               ".": "floor tile",
@@ -845,10 +885,11 @@ class Game():
     torch_radius = 10
     log = []  # message log
     game_over = False
-    cursor_x = 0
+    cursor_x = 0  # absolute coordinate, tile
     cursor_y = 0
-    #friend_image = "arch-mage-idle"
-    #foe_image = None
+
+    # friend_image = "arch-mage-idle"
+    # foe_image = None
 
     def __init__(self, tiles_x=80, tiles_y=40):
         Game.tiles_x = tiles_x  # max. width of the level in tiles
@@ -861,19 +902,21 @@ class Game():
         Wolf(2, 2, 0)
         Snake(3, 3, 0)
         Yeti(4, 4, 0)
+        Dragon(33, 6, 0)
         Dragon(30, 5, 0)
-        Shop(7,1,0)
-        Gold(2,1,0)
+        Dragon(31, 4, 0)
+        Shop(7, 1, 0)
+        Gold(2, 1, 0)
         for _ in range(15):
             Scroll(4, 4, 0)
-            Scroll(5,4,0)
-            Scroll(4,6,0)
-        #Scroll(4, 5, 0)
+            Scroll(5, 4, 0)
+            Scroll(4, 6, 0)
+        # Scroll(4, 5, 0)
         self.log.append("Welcome to the first dungeon level (level 0)!")
         self.log.append("Use cursor keys to move around")
         self.load_level(0, "level001.txt", "data")
-        #self.load_level(1, "level002.txt", "data")
-        #self.load_level(2, "level003.txt", "data")
+        # self.load_level(1, "level002.txt", "data")
+        # self.load_level(2, "level003.txt", "data")
         # TODO join create_empty_dungeon_level mit create_rooms_tunnels
         self.create_empty_dungeon_level(tiles_x, tiles_y, filled=True, z=1)  # dungoen is full of walls,
         # carve out some rooms and tunnels in this new dungeon level
@@ -883,10 +926,11 @@ class Game():
 
     def new_turn(self):
         self.turn += 1
-        #for o in Game.objects.values():
+        # for o in Game.objects.values():
         #    if o.z == self.player.z and o != self.player and o.hitpoints > 0 and isinstance(o, Monster):
-        #problem: move_monster can lead to a fight, monster may die and removed from Game.objects, while iterating over Game.objects
-        for m in [o for o in Game.objects.values() if o.z == self.player.z and o != self.player and o.hitpoints > 0 and isinstance(o, Monster)]:
+        # problem: move_monster can lead to a fight, monster may die and removed from Game.objects, while iterating over Game.objects
+        for m in [o for o in Game.objects.values() if
+                  o.z == self.player.z and o != self.player and o.hitpoints > 0 and isinstance(o, Monster)]:
             self.move_monster(m)
 
     def player_has_new_position(self):
@@ -896,8 +940,8 @@ class Game():
         myfloor = []
         for o in Game.objects.values():
             if (o.z == self.player.z and o.hitpoints > 0 and
-                not isinstance(o, Monster) and
-                o.x == self.player.x and o.y == self.player.y):
+                    not isinstance(o, Monster) and
+                    o.x == self.player.x and o.y == self.player.y):
                 myfloor.append(o)
         if len(myfloor) > 0:
             for o in myfloor:
@@ -907,7 +951,7 @@ class Game():
                     # kill gold from dungeon
                     del Game.objects[o.number]
 
-                elif  isinstance(o, Scroll):
+                elif isinstance(o, Scroll):
                     Game.log.append("you found a scroll of {}".format(o.spell))
                     if o.spell in self.player.scrolls:
                         self.player.scrolls[o.spell] += 1
@@ -917,38 +961,49 @@ class Game():
                     # kill this scroll instance in the dungeon
                     del Game.objects[o.number]
 
-
-    def fire_arrow(self):
-        """fires an arrow from player to Cursor.
-           returns flightpath if sucessfull fired, otherwise return False)"""
-        # TODO: check if player has enouth arrows in his inventory
-        if Game.cursor_y == 0 and Game.cursor_x == 0:
-            Game.log.append("you must move the cursor with w,a,s,d before shooting with f")
-            return False
+    def other_arrow(self, shooterposition, targetposition):
+        # returns start, end, victimposition(s)
+        # damage calculation
         # check if line of tiles in arrow path
-        flightpath = get_line((self.player.x, self.player.y), (self.player.x+Game.cursor_x, self.player.y+Game.cursor_y))
-        #flightpath = flightpath[:] # remove first tile, because it is blocked by player
+        flightpath = get_line(shooterposition, targetposition)
+
+        # flightpath = flightpath[1:] # remove first tile, because it is blocked by shooter
         victim = None
-        for i, (x,y) in enumerate(flightpath):
-            #print(Game.dungeon[self.player.z][y][x]) # TODO: highlight flightpath with cursor movement ?
+        for i, (x, y) in enumerate(flightpath):
+            if i == 0:
+                continue  # don't look for objects at shooterposition
+            # print(Game.dungeon[self.player.z][y][x]) # TODO: highlight flightpath with cursor movement ?
             if Game.dungeon[self.player.z][y][x].block_flying:
-                flightpath = flightpath[:i]
-                break
-            # monster blocking path (except player)
-            for o in [o for o in Game.objects.values() if o.z == self.player.z and o.y == y and o.x == x and isinstance(o, Monster) and o != self.player]:
-                # TODO: arrow damage calculation
-                Game.log.append("You hit the {} with your arrow!".format(o.__class__.__name__))
+                targetposition = flightpath[i - 1]
+                break  # some tile is blocking the path
+            # is a monster blocking path ?
+            for o in [o for o in Game.objects.values() if
+                      o.z == self.player.z and o.y == y and o.x == x and isinstance(o, Monster)]:
+                # TODO: arrow damage calculation, hit or miss calculation
+                Game.log.append("an arrow hit the {} and makes 10 damage!".format(o.__class__.__name__))
                 o.hitpoints -= 10
-                # TODO: kill Monster if hitpoints <= 0!
-                return flightpath
-        return flightpath # for animation
-        #print("flightpath", flightpath)
+                vicitm = (o.x, o.y)
+                self.remove_dead_monsters(o)  # only if really dead
+                # non-penetration arrow. the flightpath stops here!
+                # TODO: penetration arrow
+                # return flightpath[:i]
+                return shooterposition, flightpath[i], o  # o = victim
+        return shooterposition, targetposition, None  # no victim
+        # print("flightpath", flightpath)
 
-
+    def player_arrow(self):
+        """fires an arrow from player to Cursor.
+           returns start, end, victim"""
+        # TODO: check if player has enough arrows in his inventory
+        if Game.cursor_y == self.player.y and Game.cursor_x == self.player.x:
+            Game.log.append("you must move the cursor with mouse before shooting with f")
+            return None, None, None  # start, end, victim
+        return self.other_arrow((self.player.x, self.player.y),
+                                (Game.cursor_x, Game.cursor_y))
 
     def checkfight(self, x, y, z):
         """wir gehen davon aus dass nur der player schaut (checkt) ob er in ein Monster läuft"""
-        #Game.foe_image = None
+        # Game.foe_image = None
         for o in Game.objects.values():
             if o == self.player:
                 continue
@@ -961,19 +1016,19 @@ class Game():
                     o.look_direction = 0
                 elif o.x < self.player.x:
                     o.look_direction = 1
-            #if o.x == x and o.y == y and o.z == z:
+                # if o.x == x and o.y == y and o.z == z:
                 if o.x == x and o.y == y:
                     # monster should now look toward player
-                    #if o.x > self.player.x:
+                    # if o.x > self.player.x:
                     #    o.look_direction = 0
-                    #elif o.x < self.player.x:
+                    # elif o.x < self.player.x:
                     #    o.look_direction = 1
                     self.fight(self.player, o)
                     return True
         return False
 
     def move_player(self, dx=0, dy=0):
-        if not self.checkfight(self.player.x +dx, self.player.y + dy, self.player.z):
+        if not self.checkfight(self.player.x + dx, self.player.y + dy, self.player.z):
             self.player.move(dx, dy)
             self.make_fov_map()
             self.player_has_new_position()
@@ -999,38 +1054,23 @@ class Game():
         m.x += dx
         m.y += dy
 
-
-
-
-
     def fight(self, a, b):
-        self.strike(a, b)   # first strike
+        self.strike(a, b)  # first strike
         if b.hitpoints > 0:
             self.strike(b, a)  # counterstrike
         # remove dead monsters from game
-        for monster in (a, b):  # a monster is a Game.object.value, the key is it's number
-            if monster != self.player and monster.hitpoints <= 0:
-                name = monster.__class__.__name__
+        self.remove_dead_monsters(a, b)
+
+    def remove_dead_monsters(self, *monster):
+        for mo in monster:  # a monster is a Game.object.value, the key is it's number
+            if mo != self.player and mo.hitpoints <= 0:
+                name = mo.__class__.__name__
                 if name not in self.player.victims:
                     self.player.victims[name] = 1
                 else:
                     self.player.victims[name] += 1
-                del Game.objects[monster.number]
-
-
-
-
-
-
-        # big images
-        #if a == self.player:
-        #    Game.friend_image = "arch-mage-attack"
-        #    if b.image_name is not None:
-        #        Game.foe_image = b.image_name + "-attack"
-        #elif b == self.player:
-        #    Game.friend_image = "arch-mage-defend"
-        #    if a.image is not None:
-        #        Game.foe_image = a.image_name + "-attack"
+                # del Game.objects[monster.number]
+                mo.kill()
 
     def strike(self, a, b):
         # print("{} strikes at {}".format(a, b))
@@ -1071,8 +1111,8 @@ class Game():
     def cast(self, spell):
         if spell not in self.player.scrolls or self.player.scrolls[spell] < 1:
             Game.log.append("You have currently no scroll of {}".format(spell))
-            return False # no casting
-        #----- spells that need no cursor position at all -----
+            return False  # no casting
+        # ----- spells that need no cursor position at all -----
         if spell == "magic map":
             # make all tiles in this dungeon level explored
             for y, line in enumerate(Game.dungeon[self.player.z]):
@@ -1082,7 +1122,7 @@ class Game():
             self.player.calculate_scroll_list()
             return True
 
-        #----- spells that need a cursor position different from player position ---
+        # ----- spells that need a cursor position different from player position ---
         if Game.cursor_y == 0 and Game.cursor_x == 0:
             Game.log.append("you must select another tile with cursor (w,a,s,d) before casting {}".format(spell))
             return False  # no casting
@@ -1096,23 +1136,20 @@ class Game():
             if target_tile.block_movement:
                 Game.log.append("You can not blink to this tile.")
                 return False
-            if not Game.fov_map[self.player.y+Game.cursor_y][self.player.x + Game.cursor_x]:
+            if not Game.fov_map[self.player.y + Game.cursor_y][self.player.x + Game.cursor_x]:
                 Game.log.append("You can not blink on a tile outside your field of view")
                 return False
             for o in Game.objects.values():
-                if ( o.z == self.player.z and o.y == self.player.y + Game.cursor_y and
-                     o.x == self.player.x + Game.cursor_x and o != self.player and
-                     isinstance(o, Monster) and o.hitpoints > 0 ):
-                        Game.log.append("You can not blink on top of a monster")
-                        return False
+                if (o.z == self.player.z and o.y == self.player.y + Game.cursor_y and
+                        o.x == self.player.x + Game.cursor_x and o != self.player and
+                        isinstance(o, Monster) and o.hitpoints > 0):
+                    Game.log.append("You can not blink on top of a monster")
+                    return False
 
             self.move_player(Game.cursor_x, Game.cursor_y)
             self.player.scrolls["blink"] -= 1
             self.player.calculate_scroll_list()
             return True
-
-
-
 
     def load_level(self, z, name, folder="data"):
         """load a text file and return a list of non-empty lines without newline characters"""
@@ -1133,16 +1170,16 @@ class Game():
                     Stair(x, y, z, char)
                 if char == "$":
                     row.append(Tile("."))
-                    Shop(x,y,z,char)
+                    Shop(x, y, z, char)
                 if char == "*":
                     row.append(Tile("."))
-                    Gold(x,y,z, char)
+                    Gold(x, y, z, char)
                 if char == "M":
                     row.append(Tile("."))
                     if random.random() < 0.5:
-                        Wolf(x,y,z)
+                        Wolf(x, y, z)
                     else:
-                        Snake(x,y,z)
+                        Snake(x, y, z)
             level.append(row)
         try:
             Game.dungeon[z] = level
@@ -1212,7 +1249,7 @@ class Game():
             # collect all stairs down from previous level,
             # make at same position a stair up, carve a tunnel to a random room if necessary
             stairlist = [(o.x, o.y) for o in Game.objects.values() if
-                         o.char == ">" and o.z == z - 1 and isinstance(o, Stair )]
+                         o.char == ">" and o.z == z - 1 and isinstance(o, Stair)]
             print("creating prev stairlist:", stairlist)
             for (x, y) in stairlist:
                 if Game.dungeon[z][y][x].char != ".":
@@ -1244,8 +1281,9 @@ class Game():
     def use_stairs(self):
         """go up or done one dungeon level, depending on stair"""
         for o in Game.objects.values():
-            if isinstance(o, Stair)  and o.char in "<>" and o.z == self.player.z and o.y == self.player.y and o.x == self.player.x:
-                break # all ok, found a stair
+            if isinstance(o,
+                          Stair) and o.char in "<>" and o.z == self.player.z and o.y == self.player.y and o.x == self.player.x:
+                break  # all ok, found a stair
         else:
             Game.log.append("You must find a stair up to ascend or descend")
             return False
@@ -1255,7 +1293,6 @@ class Game():
         elif o.char == ">":
             self.descend()
             return True
-
 
     def ascend(self):
         """go up one dungeon level (or leave the game if already at level 0)"""
@@ -1426,19 +1463,23 @@ class Game():
                 break  # forget the rest
 
 
-class Cursor():
-
-    def __init__(self):
-        self.create_image()
+class CursorSprite(VectorSprite):
 
     def create_image(self):
         self.image = pygame.surface.Surface((Viewer.grid_size[0],
                                              Viewer.grid_size[1]))
-        c = random.randint(100, 200)
+        c = random.randint(100, 250)
         pygame.draw.rect(self.image, (c, c, c), (0, 0, Viewer.grid_size[0],
                                                  Viewer.grid_size[1]), 3)
         self.image.set_colorkey((0, 0, 0))
         self.image.convert_alpha()
+        self.rect = self.image.get_rect()
+
+    def update(self, seconds):
+        self.create_image() # always make new image every frame with different color
+        super().update(seconds)
+
+
 
 class Viewer():
     width = 0  # screen x resolution in pixel
@@ -1446,6 +1487,8 @@ class Viewer():
     panel_width = 200
     log_height = 100
     grid_size = (32, 32)
+    pcx = 0  # player x coordinate in pixel
+    pcy = 0  # player y coordinate in pixel
 
     def __init__(self, game, width=640, height=400, grid_size=(32, 32), fps=60, ):
         """Initialize pygame, window, background, font,...
@@ -1455,12 +1498,12 @@ class Viewer():
         Viewer.grid_size = grid_size  # make global readable
         Viewer.width = width
         Viewer.height = height
-        self.random1 = random.randint(1, 1000) # necessary for Viewer.wall_and_floor_theme
+        self.random1 = random.randint(1, 1000)  # necessary for Viewer.wall_and_floor_theme
         self.random2 = random.randint(1, 1000)
         pygame.init()
         # player center in pixel
-        self.pcx = (width - Viewer.panel_width) // 2  # set player in the middle of the screen
-        self.pcy = (height - Viewer.log_height) // 2
+        Viewer.pcx = (width - Viewer.panel_width) // 2  # set player in the middle of the screen
+        Viewer.pcy = (height - Viewer.log_height) // 2
         self.radarblipsize = 4  # pixel
         self.logscreen_fontsize = 15
         self.screen = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
@@ -1489,65 +1532,78 @@ class Viewer():
         # print("fontsize dim values")
         # test = make_text("@")
         self.images = {}
-        #self.load_images()
+        # self.load_images()
         self.create_tiles()
         self.wall_and_floor_theme()
-        self.cursor = Cursor()
+
         self.prepare_spritegroups()
+        self.cursor = CursorSprite(pos=pygame.math.Vector2(Viewer.pcx, Viewer.pcy))
         self.run()
 
     def prepare_spritegroups(self):
         self.allgroup = pygame.sprite.LayeredUpdates()  # for drawing
         self.flytextgroup = pygame.sprite.Group()
+        #self.cursorgroup = pygame.sprite.Group()
 
         VectorSprite.groups = self.allgroup
         Flytext.groups = self.allgroup, self.flytextgroup
         ArrowSprite.groups = self.allgroup
+        CursorSprite.groups = self.allgroup
 
-    def tile_to_pixel(self, x,y):
+    def pixel_to_tile(self, pixelcoordinate):
+        """transform pixelcoordinate (x,y, from pygame mouse).
+           returns  distance to player tile in tiles (relative coordinates)"""
+        x,y = pixelcoordinate
+        return (x - self.pcx) // Viewer.grid_size[0]  , (y-self.pcy) // Viewer.grid_size[1]
+
+
+    def tile_to_pixel(self, pos):
         """get a tile coordinate and returns pixel coordinate"""
-        x2 =  self.pcx + (x - self.game.player.x) * Viewer.grid_size[0]
-        y2 =  self.pcy + (y - self.game.player.y) * Viewer.grid_size[1]
-        return x2, y2
-
+        x, y = pos
+        x2 = self.pcx + (x - self.game.player.x) * Viewer.grid_size[0]
+        y2 = self.pcy + (y - self.game.player.y) * Viewer.grid_size[1]
+        return (x2, y2)
 
     def load_images(self):
         """single images. char looks to the right by default?"""
-        #self.images["arch-mage-attack"] = pygame.image.load(
+        # self.images["arch-mage-attack"] = pygame.image.load(
         #    os.path.join("data", "arch-mage-attack.png")).convert_alpha()
-        #self.images["arch-mage-defend"] = pygame.image.load(
+        # self.images["arch-mage-defend"] = pygame.image.load(
         #    os.path.join("data", "arch-mage-defend.png")).convert_alpha()
-        #self.images["arch-mage-idle"] = pygame.image.load(os.path.join("data", "arch-mage-idle.png")).convert_alpha()
-        #self.images["direwolf-attack"] = pygame.image.load(os.path.join("data", "direwolf-attack.png")).convert_alpha()
-        #self.images["direwolf-defend"] = pygame.image.load(os.path.join("data", "direwolf-defend.png")).convert_alpha()
-        #self.images["direwolf-idle"] = pygame.image.load(os.path.join("data", "direwolf-idle.png")).convert_alpha()
-        #self.images["snake-attack"] = pygame.image.load(os.path.join("data", "snake-attack.png")).convert_alpha()
-        #self.images["snake-defend"] = pygame.image.load(os.path.join("data", "snake-defend.png")).convert_alpha()
-        #self.images["snake-idle"] = pygame.image.load(os.path.join("data", "snake-idle.png")).convert_alpha()
-        #self.images["yeti-attack"] = pygame.image.load(os.path.join("data", "yeti-attack.png")).convert_alpha()
-        #self.images["yeti-defend"] = pygame.image.load(os.path.join("data", "yeti-defend.png")).convert_alpha()
-        #self.images["yeti-idle"] = pygame.image.load(os.path.join("data", "yeti-idle.png")).convert_alpha()
-        #self.images["dragon-attack"] = pygame.image.load(os.path.join("data", "yeti-attack.png")).convert_alpha()
-        #self.images["dragon-defend"] = pygame.image.load(os.path.join("data", "yeti-defend.png")).convert_alpha()
-        #self.images["dragon-idle"] = pygame.image.load(os.path.join("data", "yeti-idle.png")).convert_alpha()
+        # self.images["arch-mage-idle"] = pygame.image.load(os.path.join("data", "arch-mage-idle.png")).convert_alpha()
+        # self.images["direwolf-attack"] = pygame.image.load(os.path.join("data", "direwolf-attack.png")).convert_alpha()
+        # self.images["direwolf-defend"] = pygame.image.load(os.path.join("data", "direwolf-defend.png")).convert_alpha()
+        # self.images["direwolf-idle"] = pygame.image.load(os.path.join("data", "direwolf-idle.png")).convert_alpha()
+        # self.images["snake-attack"] = pygame.image.load(os.path.join("data", "snake-attack.png")).convert_alpha()
+        # self.images["snake-defend"] = pygame.image.load(os.path.join("data", "snake-defend.png")).convert_alpha()
+        # self.images["snake-idle"] = pygame.image.load(os.path.join("data", "snake-idle.png")).convert_alpha()
+        # self.images["yeti-attack"] = pygame.image.load(os.path.join("data", "yeti-attack.png")).convert_alpha()
+        # self.images["yeti-defend"] = pygame.image.load(os.path.join("data", "yeti-defend.png")).convert_alpha()
+        # self.images["yeti-idle"] = pygame.image.load(os.path.join("data", "yeti-idle.png")).convert_alpha()
+        # self.images["dragon-attack"] = pygame.image.load(os.path.join("data", "yeti-attack.png")).convert_alpha()
+        # self.images["dragon-defend"] = pygame.image.load(os.path.join("data", "yeti-defend.png")).convert_alpha()
+        # self.images["dragon-idle"] = pygame.image.load(os.path.join("data", "yeti-idle.png")).convert_alpha()
 
-    def move_cursor(self, dx=0, dy=0):
-        """moves the cursor dx, dy tiles away from the current position"""
-        target_x, target_y = self.game.player.x + Game.cursor_x + dx, self.game.player.y + Game.cursor_y + dy
+    def move_cursor_to(self, x, y):
+        """moves the cursor to tiles xy, """
+        target_x, target_y = self.game.player.x + x, self.game.player.y + y
         # check if the target tile is inside the current level dimensions
         level_width = len(Game.dungeon[self.game.player.z][0])
         level_height = len(Game.dungeon[self.game.player.z])
-        print("level dimension in tiles:", level_width, level_height, Game.cursor_x, Game.cursor_y, dx, dy)
+        #print("level dimension in tiles:", level_width, level_height, Game.cursor_x, Game.cursor_y, dx, dy)
         if target_x < 0 or target_y < 0 or target_x >= level_width or target_y >= level_height:
+            print("mouse outside level tiles", x, y)
             return  # cursor can not move outside of the current level
         # check if the target tile is outside the current game window
-        x = self.pcx + (Game.cursor_x + dx) * self.grid_size[0]
-        y = self.pcy + (Game.cursor_y + dy) * self.grid_size[1]
+        x = self.pcx + x * self.grid_size[0]
+        y = self.pcy + y * self.grid_size[1]
         if x < 0 or y < 0 or x > (self.width - self.panel_width) or y > (self.height - self.log_height):
+            print("mouse outside game panel", x, y)
             return  # cursor can not move outside of the game window
+        #
         # ---- finally, move the cursor ---
-        Game.cursor_x += dx
-        Game.cursor_y += dy
+        Game.cursor_x = target_x
+        Game.cursor_y = target_y
         # self.screen.blit(self.background, (0, 0))
 
     def make_background(self):
@@ -1574,9 +1630,11 @@ class Viewer():
     def create_tiles(self):
         """load tilemap images and create tiles for blitting"""
         # those are sprite-sheets, taken from dungeon crawl
-        player_img = pygame.image.load(os.path.join("data", "player.png")).convert_alpha()  # spritesheed, mostly 32x32, figures looking to the left
+        player_img = pygame.image.load(os.path.join("data",
+                                                    "player.png")).convert_alpha()  # spritesheed, mostly 32x32, figures looking to the left
         self.walls_img = pygame.image.load(os.path.join("data", "wall.png")).convert_alpha()  # spritesheet 32x32 pixel
-        self.floors_img = pygame.image.load(os.path.join("data", "floor.png")).convert_alpha()  # spritesheet 32x32 pixel
+        self.floors_img = pygame.image.load(
+            os.path.join("data", "floor.png")).convert_alpha()  # spritesheet 32x32 pixel
         self.walls_dark_img = self.walls_img.copy()
         self.floors_dark_img = self.floors_img.copy()
         feats_img = pygame.image.load(os.path.join("data", "feat.png")).convert_alpha()
@@ -1627,32 +1685,31 @@ class Viewer():
         # self.wall_tile_light = make_text("#", font_color=(200, 180, 50), grid_size=self.grid_size)[0]
         # self.wall_tile_light = self.lightwalls[0]  # 0
         self.unknown_tile = make_text(" ", font_color=(14, 14, 14), grid_size=self.grid_size)[0]
-        #self.stair_up_tile = make_text("<", font_color=(128, 0, 128), grid_size=self.grid_size)[0]
+        # self.stair_up_tile = make_text("<", font_color=(128, 0, 128), grid_size=self.grid_size)[0]
 
         ##self.stair_up_tile = self.lightfeats[5*35+2]
         ### stair tiles: index 0 -> light tile, index 1 -> dark tile
-        self.stair_up_tiles =  ( pygame.Surface.subsurface(feats_img, (32,192,32,32)),
-                                 pygame.Surface.subsurface(feats_dark_img, (32, 192, 32, 32)) )
-        #self.stair_up_tile_dark = pygame.Surface.subsurface(feats_dark_img, (32,192,32,32))
+        self.stair_up_tiles = (pygame.Surface.subsurface(feats_img, (32, 192, 32, 32)),
+                               pygame.Surface.subsurface(feats_dark_img, (32, 192, 32, 32)))
+        # self.stair_up_tile_dark = pygame.Surface.subsurface(feats_dark_img, (32,192,32,32))
         ##self.stair_down_tile = make_text(">", font_color=(128, 255, 128), grid_size=self.grid_size)[0]
         ### stair tiles: index 0 -> light tile, index 1 -> dark tile
-        self.stair_down_tiles = ( pygame.Surface.subsurface(feats_img, (0,192,32,32)) ,
-                                  pygame.Surface.subsurface(feats_dark_img, (0, 192, 32, 32)) )
-        #self.stair_down_tile_dark = pygame.Surface.subsurface(feats_dark_img, (0,192,32,32))
+        self.stair_down_tiles = (pygame.Surface.subsurface(feats_img, (0, 192, 32, 32)),
+                                 pygame.Surface.subsurface(feats_dark_img, (0, 192, 32, 32)))
+        # self.stair_down_tile_dark = pygame.Surface.subsurface(feats_dark_img, (0,192,32,32))
 
-        self.shop_tiles = ( pygame.Surface.subsurface(feats_img,      (439, 192, 32, 32)) ,
-                            pygame.Surface.subsurface(feats_dark_img, (439, 192, 32, 32)) )
-        self.gold_tiles = ( pygame.Surface.subsurface(main_img,       (207, 655, 26, 20)),
-                            pygame.Surface.subsurface(main_dark_img,  (207, 655, 26, 20)) )
+        self.shop_tiles = (pygame.Surface.subsurface(feats_img, (439, 192, 32, 32)),
+                           pygame.Surface.subsurface(feats_dark_img, (439, 192, 32, 32)))
+        self.gold_tiles = (pygame.Surface.subsurface(main_img, (207, 655, 26, 20)),
+                           pygame.Surface.subsurface(main_dark_img, (207, 655, 26, 20)))
         self.scroll_tiles = (pygame.Surface.subsurface(main_img, (188, 412, 27, 28)),
                              pygame.Surface.subsurface(main_dark_img, (188, 412, 27, 28)))
 
         # ------ sprites -----
-        # arrow looking right
-        self.arrow_tiles = ( pygame.Surface.subsurface(main_img, (808,224,22,7)),
-                             pygame.Surface.subsurface(main_dark_img, (808,224,22,7)))
-
-
+        # arrow looking right, only used for Sprite Animation (arrow on the ground has different picture)
+        ArrowSprite.image = pygame.Surface.subsurface(main_img, (808, 224, 22, 7))
+        # self.arrow_tiles = ( pygame.Surface.subsurface(main_img, (808,224,22,7)),
+        #                     pygame.Surface.subsurface(main_dark_img, (808,224,22,7)))
 
         self.legend = {"@": self.player_tiles,
                        " ": self.unknown_tile,
@@ -1679,7 +1736,7 @@ class Viewer():
         # create 2 very large integer numbers
         a = self.game.player.z * self.random1
         b = self.game.player.z * self.random2
-        walls = [(0, 0, 8),(256,0,8), (512,0,8), (768,0,8),
+        walls = [(0, 0, 8), (256, 0, 8), (512, 0, 8), (768, 0, 8),
                  (0, 32, 8), (256, 32, 8), (512, 32, 8), (768, 32, 8),
                  (0, 64, 8), (256, 64, 8), (512, 64, 8), (768, 64, 8),
                  (0, 96, 8), (256, 96, 8), (512, 96, 8), (768, 96, 8),
@@ -1687,17 +1744,17 @@ class Viewer():
                  (0, 160, 8), (256, 160, 8), (512, 160, 8), (768, 160, 8),
                  (0, 192, 8), (256, 192, 8), (512, 192, 8), (768, 192, 4),
                  ]
-        walls = walls[a % len(walls)] # like random.choice, but with consistent result
-        #walls = (992,384,5)
+        walls = walls[a % len(walls)]  # like random.choice, but with consistent result
+        # walls = (992,384,5)
 
         # ---- add single subimages to darkwalls and lightwalls---
         # x1,y1, x2,y2: 0,225, 32 , 256
         # see class floor, attribute decoration for probability. first img comes most often
         mywalls = []
         for i in range(walls[2]):
-            x = walls[0]+i * 32
-            y= walls[1]
-            if x > 1024-32:
+            x = walls[0] + i * 32
+            y = walls[1]
+            if x > 1024 - 32:
                 x = x - 1024
                 y += 32
 
@@ -1711,11 +1768,11 @@ class Viewer():
         # floor.png 1024x960, tiles are 32x32
         # floors: all32x32: x(topleft), y(topleft), how many elements
 
-        floors = [(576, 0, 9),(128,32,9), (416,32,9), (704,32,9), (256,64,9), (544,64,9),
-                                (96,96,9), (384,96,9), (672,96,9), (224,128,9), (512,128,9),(64,160,4),
-                                (192,160,4), (320,160,4) , (448,160,9),
-                               ]
-        floors = floors[b % len(floors)] # like random.choice, but consistent
+        floors = [(576, 0, 9), (128, 32, 9), (416, 32, 9), (704, 32, 9), (256, 64, 9), (544, 64, 9),
+                  (96, 96, 9), (384, 96, 9), (672, 96, 9), (224, 128, 9), (512, 128, 9), (64, 160, 4),
+                  (192, 160, 4), (320, 160, 4), (448, 160, 9),
+                  ]
+        floors = floors[b % len(floors)]  # like random.choice, but consistent
         ##floors = (928,512,10)
         myfloors = []
         for i in range(floors[2]):
@@ -1724,7 +1781,7 @@ class Viewer():
             if x > 1024 - 32:
                 x = x - 1024
                 y += 32
-            myfloors.append((x,y))
+            myfloors.append((x, y))
         self.darkfloors = []
         self.lightfloors = []
         for (x, y) in myfloors:
@@ -1746,7 +1803,6 @@ class Viewer():
         if (x + self.grid_size[0]) < 0 or (y + self.grid_size[1]) < 0:
             return
 
-
         self.screen.blit(surface, (x, y))
 
     def draw_dungeon(self):
@@ -1757,7 +1813,7 @@ class Viewer():
                 distance = ((x - px) ** 2 + (y - py) ** 2) ** 0.5
                 # ---- check if tiles is outside torch radius of player ----
                 # ---- or otherwise (mostly) invisible
-                #print("dist, x, y", distance, x, y)
+                # print("dist, x, y", distance, x, y)
                 if distance > Game.torch_radius or Game.fov_map[y][x] == False:
                     # -- only blit (dark) if tile is explored. only draw explored Items (stairs)
                     if map_tile.explored:
@@ -1768,7 +1824,7 @@ class Viewer():
                             # c = self.darkwalls[map_tile.i]
                         elif map_tile.char == ".":
                             i = map_tile.decoration % len(self.darkfloors)
-                            #c = self.darkfloors[map_tile.decoration]
+                            # c = self.darkfloors[map_tile.decoration]
                             c = self.darkfloors[i]
                         else:
                             raise SystemError("strange tile in map:", c)
@@ -1781,10 +1837,10 @@ class Viewer():
                     olist = [o for o in Game.objects.values() if
                              o.explored and o.stay_visible_once_explored and o.z == z and o.y == y and o.x == x]
                     for o in olist:
-                        #print("blitting....", o.char)
-                        #if o.char in "<>":
+                        # print("blitting....", o.char)
+                        # if o.char in "<>":
                         self.tile_blit(self.legend[o.char][1], x, y)
-                        #else:
+                        # else:
                         #    self.tile_blit(self.legend[o.char], x, y)
                     continue  # next tile, please
                 # ==============================================
@@ -1796,12 +1852,12 @@ class Viewer():
                 # --- blit dungeon tile ----
                 # TODO: option to skip blitting dungeon tile if Monster or object is here
                 # print(self.game.player.z, map_tile.char)
-                if map_tile.char in "#.": # light floor or light wall
-                   i = map_tile.decoration % len(self.legend[map_tile.char])
-                   c = self.legend[map_tile.char][i]
+                if map_tile.char in "#.":  # light floor or light wall
+                    i = map_tile.decoration % len(self.legend[map_tile.char])
+                    c = self.legend[map_tile.char][i]
                 else:
-                   # ?????
-                   c = self.legend[map_tile.char][map_tile.decoration]  # light tiles
+                    # ?????
+                    c = self.legend[map_tile.char][map_tile.decoration]  # light tiles
                 # self.screen.blit(c, (x * self.grid_size[0], y * self.grid_size[1]))
                 # self.screen.blit(c, (x * self.grid_size[0], y * self.grid_size[1]))
                 self.tile_blit(c, x, y)  # first, blit the dungeon tile
@@ -1821,15 +1877,15 @@ class Viewer():
             if o.z == z and o.y == y and o.x == x:  # only care if in the correct dungeon level
                 # -- only care if NOT: Monster class instances or instances that are a child of the Monster class
                 if not isinstance(o, Monster):
-                    #if o.char in "<>$*": # TODO check if tuple instead surface
-                        c=self.legend[o.char][0] # light tile
-                    #else:
+                    # if o.char in "<>$*": # TODO check if tuple instead surface
+                    c = self.legend[o.char][0]  # light tile
+                    # else:
                     #    print("ALAAAAAAAAAAAAAAARRRRRMMM")
                     #    c = self.legend[o.char]
-                    #print("c = ", c, o.char)
-                        o.explored = True   # redundant ?
+                    # print("c = ", c, o.char)
+                    o.explored = True  # redundant ?
                     # self.screen.blit(c, (m.x * self.grid_size[0], m.y * self.grid_size[1]))
-                        self.tile_blit(c, o.x, o.y)
+                    self.tile_blit(c, o.x, o.y)
 
     def draw_monsters(self, x, y):
         z = self.game.player.z
@@ -1842,13 +1898,12 @@ class Viewer():
                     # correction so that if monster surface != size of tile surface monster is centered on tile
                     corr_x, corr_y = 0, 0
                     if c.get_size() != self.grid_size:
-                        corr_x = (self.grid_size[0] - c.get_size()[0])//2
-                        corr_y = (self.grid_size[1] - c.get_size()[1])//2
+                        corr_x = (self.grid_size[0] - c.get_size()[0]) // 2
+                        corr_y = (self.grid_size[1] - c.get_size()[1]) // 2
 
-
-                    #if o == self.game.player:
+                    # if o == self.game.player:
                     #    self.screen.blit(c, (self.pcx+corr_x, self.pcy+corr_y))  # blit the player always in middle of screen
-                    #else:
+                    # else:
                     o.explored = True
                     self.tile_blit(c, o.x, o.y, corr_x, corr_y)
                     break  # one monster per tile is enough
@@ -1864,12 +1919,12 @@ class Viewer():
             for y in range(self.game.player.y - delta_tiles, self.game.player.y + delta_tiles + 1):
                 if y < 0:
                     continue
-                distance = ( (x-self.game.player.x)**2 + (y-self.game.player.y)**2 )** 0.5
+                distance = ((x - self.game.player.x) ** 2 + (y - self.game.player.y) ** 2) ** 0.5
                 try:
                     t = Game.dungeon[self.game.player.z][y][x]
                 except:
                     continue
-                color = (10, 10, 10) # black
+                color = (10, 10, 10)  # black
                 dx = -(x - self.game.player.x) * self.radarblipsize
                 dy = -(y - self.game.player.y) * self.radarblipsize
                 if t.explored:
@@ -1877,7 +1932,7 @@ class Viewer():
                         color = (50, 50, 250)  # blue wall
                     else:
                         color = (150, 150, 150)  # light grey corridor
-                    #pygame.draw.rect(self.radarscreen, color,
+                    # pygame.draw.rect(self.radarscreen, color,
                     #                 (self.rcx - dx, self.rcy - dy, self.radarblipsize, self.radarblipsize))
                 # ---if a stair is there, paint it (if explored) ---
                 for o in Game.objects.values():
@@ -1888,17 +1943,16 @@ class Viewer():
                             else:
                                 color = (64, 255, 64)
                         elif isinstance(o, Shop) and o.explored:
-                            color = (200,200,200)
+                            color = (200, 200, 200)
                         elif isinstance(o, Item):
                             if Game.fov_map[y][x] or distance < self.game.player.sniffrange_items:
-                                 color = (0,200,0)
+                                color = (0, 200, 0)
                         elif isinstance(o, Monster):
                             if Game.fov_map[y][x] or distance < self.game.player.sniffrange_monster:
-                                 color = (255,0,0)
-
+                                color = (255, 0, 0)
 
                 pygame.draw.rect(self.radarscreen, color,
-                        (self.rcx - dx, self.rcy - dy, self.radarblipsize, self.radarblipsize))
+                                 (self.rcx - dx, self.rcy - dy, self.radarblipsize, self.radarblipsize))
         # make withe glowing dot at center of radarmap
         white = random.randint(200, 255)
         color = (white, white, white)
@@ -1926,15 +1980,18 @@ class Viewer():
               color=(255, 255, 255), font_size=24)
         # -y65 ----------------------
         write(self.panelscreen, text="Gold: {}".format(
-              self.game.player.gold), x=5, y=65, color=(255, 255, 0), font_size=24)
+            self.game.player.gold), x=5, y=65, color=(255, 255, 0), font_size=24)
 
         # --- write cursor information into panel ---
         # - y95 ------
 
-        tilex, tiley = self.game.player.x + Game.cursor_x, self.game.player.y + Game.cursor_y
+        tilex, tiley = Game.cursor_x,  Game.cursor_y
         ##print("cursor is at ", tilex, tiley, "=", self.tile_to_pixel(tilex, tiley))
+        print("tile:", tilex, tiley)
         t = Game.dungeon[self.game.player.z][tiley][tilex]
-        write(self.panelscreen, text="x:{} y:{} turn:{}".format(tilex, tiley, self.game.turn), x=5, y=95, color=(255, 255, 255),
+
+        write(self.panelscreen, text="x:{} y:{} turn:{}".format(tilex, tiley, self.game.turn), x=5, y=95,
+              color=(255, 255, 255),
               font_size=16)
         # tile information
         # - y115
@@ -1943,12 +2000,21 @@ class Viewer():
         # objects on top of that tile ?
         here = []
         hints = []
-        for o in Game.objects.values():
-            # print("object:",o)
-            if o.z == self.game.player.z and o.x == tilex and o.y == tiley and o.hitpoints > 0:
-                here.append(o)
-                if o.hint is not None:
-                    hints.append(o.hint)
+        if t.explored:
+            for o in Game.objects.values():
+                # print("object:",o)
+                if o.z == self.game.player.z and o.x == tilex and o.y == tiley and o.hitpoints > 0:
+                    if not isinstance(o, Monster):
+                        here.append(o)
+                        if o.hint is not None:
+                            hints.append(o.hint)
+                    else:
+                        # monster only if inside fov
+                        if Game.fov_map[o.y][o.x]:
+                            here.append(o)
+                            if o.hint is not None:
+                                hints.append(o.hint)
+
         # print(here)
         dy = 0
         for dy, thing in enumerate(here):
@@ -1960,13 +2026,13 @@ class Viewer():
         # --- print hints ----
         y = 135 + 20 * dy + 50
         for h in hints:
-            write(self.panelscreen, text=h, x=5, y=y, color=(0,0,0), font_size=10)
+            write(self.panelscreen, text=h, x=5, y=y, color=(0, 0, 0), font_size=10)
             y += 20
 
         # ---- magic scrolls -----
         if len(self.game.player.scrolls) > 0:
-            write(self.panelscreen, text="Magic: use CTRL+", color=(80,0,80),
-                  font_size = 20, x=5, y=y)
+            write(self.panelscreen, text="Magic: use CTRL+", color=(80, 0, 80),
+                  font_size=20, x=5, y=y)
             y += 20
         for key, spell, number in self.game.player.scroll_list:
             t = "{}: {} x {}".format(key, spell, number)
@@ -1975,8 +2041,8 @@ class Viewer():
 
         # blit panelscreen
         # ----- friend and foe ----
-        #self.panelscreen.blit(self.images[Game.friend_image], (10, 400))
-        #if Game.foe_image is not None:
+        # self.panelscreen.blit(self.images[Game.friend_image], (10, 400))
+        # if Game.foe_image is not None:
         #    self.panelscreen.blit(self.images[Game.foe_image], (100, 400))#
 
         self.screen.blit(self.panelscreen, (Viewer.width - self.panel_width, self.panel_width))
@@ -2003,15 +2069,42 @@ class Viewer():
 
     def new_turn(self):
         """new turn in Viewer, calls new turn in Game and updates graphics that may have changed, plays animations etc"""
+        # all shooters (except player) shoot their arrows at the same time
+
+        for monster in [o for o in Game.objects.values() if
+                        o != self.game.player and o.z == self.game.player.z and isinstance(o,
+                                                                                           Monster) and o.shoot_arrows]:
+            # calculate distance to player
+            distance = ((monster.x - self.game.player.x) ** 2 + (monster.y - self.game.player.y) ** 2) ** 0.5
+            # monster shoots at you if it can, player is in shooting range and player sees monster
+            # print(monster, monster.y, monster.x)
+            if Game.fov_map[monster.y][monster.x] and distance < monster.arrow_range:
+                ## FlyObject (start, end)
+                start, end, victimpos = self.game.other_arrow((monster.x, monster.y),
+                                                              (self.game.player.x, self.game.player.y))
+                a = ArrowSprite(startpos=self.tile_to_pixel(start), endpos=self.tile_to_pixel(end))
+                if self.playtime + a.duration > self.animation:
+                    self.animation = self.playtime + a.duration
+                if victimpos is not None:
+                    pass  # todo victim impact animation
+
+        self.animate_sprites_only()
+
         self.game.new_turn()
         self.redraw = True
-        #self.redraw = True
+        # self.redraw = True
 
-    def animate_sprites_only(self, seconds):
-        self.allgroup.clear(self.screen, self.spriteless_background)
-        self.allgroup.update(seconds)
-        self.allgroup.draw(self.screen)
-        pygame.display.update()
+    def animate_sprites_only(self):
+        """loop as long as necessary to finish all animations, before coninuing with main loop"""
+        while self.animation > self.playtime:
+            milliseconds = self.clock.tick(self.fps)  #
+            seconds = milliseconds / 1000
+            self.playtime += seconds
+
+            self.allgroup.clear(self.screen, self.spriteless_background)
+            self.allgroup.update(seconds)
+            self.allgroup.draw(self.screen)
+            pygame.display.update()
 
     def run(self):
         """The mainloop"""
@@ -2023,7 +2116,7 @@ class Viewer():
         # exittime = 0
         self.spriteless_background = pygame.Surface((Viewer.width, Viewer.height))
         show_range = False
-        animation = 0 # how many seconds animation should be played until the game accept inputs, new turn etc again
+        self.animation = 0  # how many seconds animation should be played until the game accept inputs, new turn etc again
         reset_cursor = True
         log_lines = len(Game.log)
         while running:
@@ -2034,17 +2127,24 @@ class Viewer():
             milliseconds = self.clock.tick(self.fps)  #
             seconds = milliseconds / 1000
             # --- redraw whole screen if animation has ended ----
-            #if animation > self.playtime and animation < (self.playtime + seconds):
+            # if animation > self.playtime and animation < (self.playtime + seconds):
             #    self.redraw = True
 
             self.playtime += seconds
 
-            # ---------animation -------
-            if animation > self.playtime:
-                self.animate_sprites_only(seconds)
-                continue # ignore rest of main loop
+            # ------ mouse handler ------
+            # left, middle, right = pygame.mouse.get_pressed()
+            # oldleft, oldmiddle, oldright = left, middle, right
 
-            # ----------- End of animation --------------
+            # ------ joystick handler -------
+            # for number, j in enumerate(self.joysticks):
+            #    if number == 0:
+            #        x = j.get_axis(0)
+            #        y = j.get_axis(1)
+            #        buttons = j.get_numbuttons()
+            #        for b in range(buttons):
+            #            pushed = j.get_button(b)
+
             # ------------ pressed keys (in this moment pressed down)------
             pressed_keys = pygame.key.get_pressed()
 
@@ -2057,165 +2157,162 @@ class Viewer():
                     if event.key == pygame.K_ESCAPE:
                         running = False
                     # ---- move the game cursor with wasd ----
-                    if event.key == pygame.K_a:
-                        self.move_cursor(-1, 0)
-                        self.redraw = True
-                        reset_cursor = False
-                        # Game.cursor_x -= 1
-                    if event.key == pygame.K_d:
-                        self.move_cursor(1, 0)
-                        self.redraw = True
-                        reset_cursor = False
-
-                        # Game.cursor_x += 1
-                    if event.key == pygame.K_w:
-                        self.move_cursor(0, -1)
-                        self.redraw = True
-                        reset_cursor = False
-
-                        # Game.cursor_y -= 1
-                    if event.key == pygame.K_s:
-                        self.move_cursor(0, 1)
-                        self.redraw = True
-                        reset_cursor = False
-
-                        # Game.cursor_y += 1
-
-
+                    #if event.key == pygame.K_a:
+                    #    self.move_cursor(-1, 0)
+                    #    self.redraw = True
+                    #    reset_cursor = False
+                    #    # Game.cursor_x -= 1
+                    #if event.key == pygame.K_d:
+                    #    self.move_cursor(1, 0)
+                    #    self.redraw = True
+                    #    reset_cursor = False
+                    #
+                    #    # Game.cursor_x += 1
+                    #if event.key == pygame.K_w:
+                    #    self.move_cursor(0, -1)
+                    #    self.redraw = True
+                    #    reset_cursor = False#
+                    #
+                    #    # Game.cursor_y -= 1
+                    #if event.key == pygame.K_s:
+                    #    self.move_cursor(0, 1)
+                    #    self.redraw = True
+                    #    reset_cursor = False
+                    #
+                    #    # Game.cursor_y += 1
+                    #
                     # ----------- magic with ctrl key and dynamic key -----
-                    #if pressed_keys[pygame.K_RCTRL] or pressed_keys[pygame.K_LCTRL]:
-                    if event.mod & pygame.KMOD_CTRL: # any or both ctrl keys are pressed
-                        key =  pygame.key.name(event.key) # name of event key: a, b, c etc.
-                        spell = self.game.player.spell_from_key(key) # get the spell that is currently bond to this key
-                        if self.game.cast(spell): # sucessfull casting -> new turn
+                    # if pressed_keys[pygame.K_RCTRL] or pressed_keys[pygame.K_LCTRL]:
+                    if event.mod & pygame.KMOD_CTRL:  # any or both ctrl keys are pressed
+                        key = pygame.key.name(event.key)  # name of event key: a, b, c etc.
+                        spell = self.game.player.spell_from_key(key)  # get the spell that is currently bond to this key
+                        if self.game.cast(spell):  # sucessfull casting -> new turn
                             self.new_turn()
 
-                    # ---- shoot laser beam to cursor -----
-                    if event.key == pygame.K_1:
-                        # play animation only for 2 seconds
-                        animation = self.playtime + 2
                     # ---- -simple player movement with cursor keys -------
-                    if event.key in ( pygame.K_RIGHT, pygame.K_KP6 ) :
+                    if event.key in (pygame.K_RIGHT, pygame.K_KP6):
                         self.new_turn()
                         self.game.move_player(1, 0)
 
-                    if event.key in ( pygame.K_LEFT, pygame.K_KP4 ):
+                    if event.key in (pygame.K_LEFT, pygame.K_KP4):
                         self.new_turn()
-                        self.game.move_player(-1,0)
+                        self.game.move_player(-1, 0)
 
-                    if event.key in ( pygame.K_UP, pygame.K_KP8):
+                    if event.key in (pygame.K_UP, pygame.K_KP8):
                         self.new_turn()
-                        self.game.move_player(0,-1)
+                        self.game.move_player(0, -1)
 
-                    if event.key in ( pygame.K_DOWN, pygame.K_KP2):
+                    if event.key in (pygame.K_DOWN, pygame.K_KP2):
                         self.new_turn()
-                        self.game.move_player(0,1)
+                        self.game.move_player(0, 1)
 
                     # --- diagonal movement ---
                     if event.key in (pygame.K_KP7, pygame.K_HOME):
                         self.new_turn()
-                        self.game.move_player(-1,-1)
+                        self.game.move_player(-1, -1)
 
                     if event.key in (pygame.K_KP9, pygame.K_PAGEUP):
                         self.new_turn()
-                        self.game.move_player(1,-1)
+                        self.game.move_player(1, -1)
 
                     if event.key in (pygame.K_KP1, pygame.K_END):
                         self.new_turn()
-                        self.game.move_player(-1,1)
+                        self.game.move_player(-1, 1)
 
                     if event.key in (pygame.K_KP3, pygame.K_PAGEDOWN):
                         self.new_turn()
-                        self.game.move_player(1,1)
+                        self.game.move_player(1, 1)
 
                     if event.key == pygame.K_SPACE:
-                        #Game.turn += 1  # wait a turn
+                        # Game.turn += 1  # wait a turn
                         self.new_turn()
-                        # wenn auf shop buy one hp for one gold
+                        # on shop buy 10 hp for one gold
                         for o in Game.objects.values():
                             if (o.z == self.game.player.z and
-                                o.x == self.game.player.x and
-                                o.y == self.game.player.y and
-                                self.game.player.gold > 0 and
-                                o.__class__.__name__=="Shop"):
+                                    o.x == self.game.player.x and
+                                    o.y == self.game.player.y and
+                                    self.game.player.gold > 0 and
+                                    isinstance(o, Shop)):
+                                # and o.__class__.__name__=="Shop"):
                                 self.game.player.gold -= 1
-                                self.game.player.hitpoints += 1
+                                self.game.player.hitpoints += 10
 
                         self.redraw = True
 
                     if event.key == pygame.K_x:
-                        Flytext(text="Hallo Horst", pos=pygame.math.Vector2(300,300), move=pygame.math.Vector2(0,-10), max_age=15)
+                        Flytext(text="Hallo Horst", pos=pygame.math.Vector2(300, 300), move=pygame.math.Vector2(0, -10),
+                                max_age=15)
 
                     if event.key == pygame.K_f:
                         # fire arrow to cursor
-                        path =  self.game.fire_arrow()
-                        if path:
+                        start, end, victimpos = self.game.player_arrow()  # None , None, None  when player can not shoot, otherwise startpos, endpos, victim
+                        if start is not None:
+                            a = ArrowSprite(startpos=self.tile_to_pixel(start), endpos=self.tile_to_pixel(end))
+                            self.animation = self.playtime + a.duration
+                            if victimpos is not None:
+                                pass  # todo victim impact animation
 
-                            speed = 150 # pixel / second
-                            # arrow was sucessfully fired
-                            target = self.tile_to_pixel(path[-1][0], path[-1][1]) # destination coordinate in pixel
-                            movevector = pygame.math.Vector2((target[0]-self.pcx), (target[1]-self.pcy))
-                            #print("movevector", mfdd)
-                            distance = movevector.length()
-                            movevector.normalize_ip() # reduce to lenght 1
-                            movevector *= speed   #
-                            self.animation = self.playtime + distance / speed  # arrow flies 10 tiles per second
-                            #print("animation duration:", self.animation- self.playtime)
-                            # arrow shall start in the middle of tile, not in the topleft corner
-                            startpos = pygame.math.Vector2(self.pcx+ Viewer.grid_size[0]//2, self.pcy+Viewer.grid_size[1]//2)
-                            image = pygame.transform.rotate(self.arrow_tiles[0], movevector.angle_to(pygame.math.Vector2(1,0)))
-
-                            ArrowSprite(pos=startpos, move=movevector, max_distance = distance, picture=image)
-                            self.animate_sprites_only(seconds)
+                            self.animate_sprites_only()
                             self.new_turn()
 
-
-                    if event.key in ( pygame.K_LESS, pygame.K_GREATER) :
+                    if event.key in (pygame.K_LESS, pygame.K_GREATER):
                         self.new_turn()
                         # go up a level
                         if self.game.use_stairs():
                             self.redraw = True
-                            self.wall_and_floor_theme() # new walls and floor colors
+                            self.wall_and_floor_theme()  # new walls and floor colors
 
-                    if event.key == pygame.K_r:
-                        # zoom out radar
-                        self.radarblipsize *= 0.5
-                        self.radarblipsize = int(max(1, self.radarblipsize))  # don't become zero
-                        print("radarblip:", self.radarblipsize)
-
-                        self.redraw = True
-                    if event.key == pygame.K_t:
-                        # zoom in radar
-                        self.radarblipsize *= 2
-                        self.radarblipsize = min(64, self.radarblipsize)  # don't become absurd large
-                        self.redraw = True
-                    # --- increase torch radius ---
                     if event.key == pygame.K_PLUS:
-                        Game.torch_radius += 1
-                        self.game.make_fov_map()
-                        self.redraw = True
-                    # --- decrease torch radius ----
-                    if event.key == pygame.K_MINUS:
-                        Game.torch_radius -= 1
+                        if event.mod & pygame.KMOD_CTRL:
+                            # zoom out radar
+                            self.radarblipsize *= 0.5
+                            self.radarblipsize = int(max(1, self.radarblipsize))  # don't become zero
+                            print("radarblip:", self.radarblipsize)
+                            self.redraw = True
+                        else:
+                            # more torch radius
+                            Game.torch_radius += 1
+                            self.game.make_fov_map()
+                            self.redraw = True
 
-                        self.game.make_fov_map()
-                        self.redraw = True
+
+                    if event.key == pygame.K_MINUS:
+                        if event.mod & pygame.KMOD_CTRL:
+                            # zoom in radar
+                            self.radarblipsize *= 2
+                            self.radarblipsize = min(64, self.radarblipsize)  # don't become absurd large
+                            self.redraw = True
+                        else:
+                            # --- decrease torch radius ----
+                            Game.torch_radius -= 1
+                            self.game.make_fov_map()
+                            self.redraw = True
+
+            # --- set cursor to mouse if inside play area -----
+            x,y =  self.pixel_to_tile(pygame.mouse.get_pos())
+            self.move_cursor_to(x,y) # only moves if on valid tile
+
 
             # ============== draw screen =================
-            #screen_without_sprites = self.screen.copy()
-            #self.allgroup.clear(bgd=self.screen)
-            self.allgroup.clear(self.screen, self.spriteless_background )
+            # screen_without_sprites = self.screen.copy()
+            # self.allgroup.clear(bgd=self.screen)
+            self.allgroup.clear(self.screen, self.spriteless_background)
 
             self.allgroup.update(seconds)
 
-            #dirtyrects = []
-            dirtyrects =  self.allgroup.draw(self.screen)
+            # dirtyrects = []
+            dirtyrects = self.allgroup.draw(self.screen)
+
+
+
 
             if self.redraw:
+                #print(self.pixel_to_tile(pygame.mouse.get_pos()))
+                #if self.pixel_to_tile(pygame.mouse.get_pos()) is not (None, None) and reset_cursor:
 
-                if reset_cursor:
-                    Game.cursor_x, Game.cursor_y = 0, 0
-                reset_cursor = True
+                    #if reset_cursor and
+                #    Game.cursor_x, Game.cursor_y = 0, 0
+                #reset_cursor = True
                 # delete everything on screen
                 self.screen.blit(self.background, (0, 0))
                 # --- order of drawing (back to front) ---
@@ -2225,31 +2322,19 @@ class Viewer():
                 dirtyrects.append((0, 0, Viewer.width, Viewer.height))
                 # self.draw_panel()
                 self.draw_log()
-                self.spriteless_background.blit(self.screen, (0,0))
+                self.spriteless_background.blit(self.screen, (0, 0))
 
             elif len(Game.log) > log_lines:
-                self.draw_log()   # always draw log
+                self.draw_log()  # always draw log
                 log_lines = len(Game.log)
-                dirtyrects.append(( 0, Viewer.height - self.log_height, Viewer.width, self.log_height))
+                dirtyrects.append((0, Viewer.height - self.log_height, Viewer.width, self.log_height))
 
             self.draw_panel()  # always draw panel
-            dirtyrects.append((Viewer.width-self.panel_width, 0, Viewer.panel_width, Viewer.height))
+            dirtyrects.append((Viewer.width - self.panel_width, 0, Viewer.panel_width, Viewer.height))
 
             self.redraw = False
 
 
-            # ------ mouse handler ------
-            #left, middle, right = pygame.mouse.get_pressed()
-            #oldleft, oldmiddle, oldright = left, middle, right
-
-            # ------ joystick handler -------
-            #for number, j in enumerate(self.joysticks):
-            #    if number == 0:
-            #        x = j.get_axis(0)
-            #        y = j.get_axis(1)
-            #        buttons = j.get_numbuttons()
-            #        for b in range(buttons):
-            #            pushed = j.get_button(b)
 
             # write text below sprites
             fps_text = "FPS: {:5.3}".format(self.clock.get_fps())
@@ -2257,14 +2342,9 @@ class Viewer():
             write(self.screen, text=fps_text, origin="bottomright", x=Viewer.width - 2, y=Viewer.height - 2,
                   font_size=16, bold=True, color=(0, 0, 0))
 
-
             # ------ Cursor -----
-            # is NOT a sprite!
-            if Game.cursor_y != 0 or Game.cursor_x != 0: # only blit cursor if outside player
-                self.cursor.create_image()
-                self.screen.blit(self.cursor.image, (
-                    self.pcx + Game.cursor_x * self.grid_size[0],
-                    self.pcy + Game.cursor_y * self.grid_size[1]))
+            self.cursor.pos = pygame.math.Vector2(self.tile_to_pixel((Game.cursor_x, Game.cursor_y)))
+            self.cursor.pos += pygame.math.Vector2(Viewer.grid_size[0]//2, Viewer.grid_size[1]//2) # center on tile
             # -------- next frame -------------
             pygame.display.update(dirtyrects)
         # -----------------------------------------------------
