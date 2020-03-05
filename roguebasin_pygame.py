@@ -3,16 +3,15 @@ author: Horst JENS
 email: horstjens@gmail.com
 contact: see http://spielend-programmieren.at/de:kontakt
 license: gpl, see http://www.gnu.org/licenses/gpl-3.0.de.html
-download:
+download: https://github.com/horstjens/roguebasin_python3
 
 based on: http://www.roguebasin.com/index.php?title=Complete_Roguelike_Tutorial,_using_python%2Blibtcod,_part_4
 
 field of view and exploration
-also
 see http://www.roguebasin.com/index.php?title=Comparative_study_of_field_of_view_algorithms_for_2D_grid_based_worlds
 
 field of view improving, removing of artifacts:
-https://sites.google.com/site/jicenospam/visibilitydetermination
+see https://sites.google.com/site/jicenospam/visibilitydetermination
 
 """
 import pygame
@@ -24,7 +23,7 @@ import os
 # declare constants
 ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-
+#TODO: nach magic missle kommt automatisch ein arrow
 #  TODO monster speed > 1 tile possible ?
 #  TODO rework NaturalWeapon
 #  TODO Item
@@ -49,6 +48,7 @@ class VectorSprite(pygame.sprite.Sprite):
         self.rect.center = (-300, -300)  # avoid blinking image in topleft corner
         if self.angle != 0:
             self.set_angle(self.angle)
+        #self.visible = False # will be changed to True when age becomes positive
 
     def _overwrite_parameters(self):
         """change parameters before create_image is called"""
@@ -70,6 +70,9 @@ class VectorSprite(pygame.sprite.Sprite):
             self.pos = pygame.math.Vector2(150, 150)
         if "move" not in kwargs:
             self.move = pygame.math.Vector2(0, 0)
+        #if "acceleration" not in kwargs:
+        #    self.acc = 0.0 # pixel/second speed is constant
+        # TODO: acc, gravity-vector
         if "radius" not in kwargs:
             self.radius = 5
         if "width" not in kwargs:
@@ -110,6 +113,8 @@ class VectorSprite(pygame.sprite.Sprite):
             self.speed = None
         if "age" not in kwargs:
             self.age = 0  # age in seconds
+        if "visible" not in kwargs:
+            self.visible = False # becomes True when self.age becomes >= 0
 
     def kill(self):
         if self.number in self.numbers:
@@ -152,6 +157,11 @@ class VectorSprite(pygame.sprite.Sprite):
         # ----- kill because... ------
         # if self.hitpoints <= 0:
         #    self.kill()
+        # TODO: pygame.DirtySprite verwenden, mit dirty und visible flag
+        if self.age < 0:
+            self.visible = False
+        else:
+            self.visible = True
         if self.max_age is not None and self.age > self.max_age:
             self.kill()
         if self.max_distance is not None and self.distance_traveled > self.max_distance:
@@ -165,11 +175,15 @@ class VectorSprite(pygame.sprite.Sprite):
                 boss = VectorSprite.numbers[self.bossnumber]
                 # self.pos = v.Vec2d(boss.pos.x, boss.pos.y)
                 self.pos = pygame.math.Vector2(boss.pos.x, boss.pos.y)
-        self.pos += self.move * seconds
-        self.distance_traveled += self.move.length() * seconds
+        if self.age > 0:
+            self.pos += self.move * seconds
+            self.distance_traveled += self.move.length() * seconds
         self.age += seconds
-        self.wallbounce()
-        self.rect.center = (round(self.pos.x, 0), round(self.pos.y, 0))
+        if not self.visible:
+            self.rect.center = (-200,-200)
+        else:
+            self.wallbounce()
+            self.rect.center = (round(self.pos.x, 0), round(self.pos.y, 0))
 
     def wallbounce(self):
         # ---- bounce / kill on screen edge ----
@@ -211,6 +225,10 @@ class VectorSprite(pygame.sprite.Sprite):
             elif self.warp_on_edge:
                 self.pos.y = 0
 
+
+class Fragment(VectorSprite):
+
+    pass # TODO update: image.set_alpha(0=full transp, 255=not transp)
 
 
 class Flytext(VectorSprite):
@@ -1006,8 +1024,8 @@ class Game():
                     # kill this scroll instance in the dungeon
                     del Game.objects[o.number]
 
-    def other_arrow(self, shooterposition, targetposition):
-        # returns start, end, victimposition(s)
+    def other_arrow(self, shooterposition, targetposition, object="arrow"):
+        # returns  end-tile , victimposition(s)
         # damage calculation
         # check if line of tiles in arrow path
         flightpath = get_line(shooterposition, targetposition)
@@ -1024,27 +1042,27 @@ class Game():
             # is a monster blocking path ?
             for o in [o for o in Game.objects.values() if
                       o.z == self.player.z and o.y == y and o.x == x and isinstance(o, Monster)]:
-                # TODO: arrow damage calculation, hit or miss calculation
-                Game.log.append("an arrow hit the {} and makes 10 damage!".format(o.__class__.__name__))
+                # TODO: arrow/object damage calculation, hit or miss calculation
+                Game.log.append("a {} hit the {} and makes 10 damage!".format(object, o.__class__.__name__))
                 o.hitpoints -= 10
                 vicitm = (o.x, o.y)
                 self.remove_dead_monsters(o)  # only if really dead
                 # non-penetration arrow. the flightpath stops here!
                 # TODO: penetration arrow
                 # return flightpath[:i]
-                return shooterposition, flightpath[i], o  # o = victim
-        return shooterposition, targetposition, None  # no victim
+                return flightpath[i], o  # o = victim
+        return targetposition, None  # no victim
         # print("flightpath", flightpath)
 
     def player_arrow(self):
         """fires an arrow from player to Cursor.
-           returns start, end, victim"""
+           returns  end, victim"""
         if self.player.arrows < 1:
             Game.log.append("you must find/buy some arrows before you can shoot them")
-            return None, None, None
+            return None, None
         if Game.cursor_y == self.player.y and Game.cursor_x == self.player.x:
             Game.log.append("you must move the cursor with mouse before shooting with f")
-            return None, None, None  # start, end, victim
+            return None, None  # start, end, victim
         self.player.arrows -= 1
         return self.other_arrow((self.player.x, self.player.y),
                                 (Game.cursor_x, Game.cursor_y))
@@ -1171,12 +1189,21 @@ class Game():
             return True
 
         # ----- spells that need a cursor position different from player position ---
-        if Game.cursor_y == 0 and Game.cursor_x == 0:
-            Game.log.append("you must select another tile with cursor (w,a,s,d) before casting {}".format(spell))
+        if Game.cursor_y == self.player.y and Game.cursor_x == self.player.x:
+            Game.log.append("you must select another tile with the mouse before casting {}".format(spell))
             return False  # no casting
 
-        if spell == "blink":
-            # teleport to cursor position TODO: check for wall and illegal landing tiles
+        if spell == "magic missile":
+            # shoot to Monster at cursor position
+            self.player.scrolls["magic missile"] -= 1
+            self.player.calculate_scroll_list()
+            return  self.other_arrow((self.player.x, self.player.y),
+                                    (Game.cursor_x, Game.cursor_y), "magic missile")
+            # return start, end, victim
+
+
+        elif spell == "blink":
+            # teleport to cursor position
             target_tile = Game.dungeon[self.player.z][Game.cursor_y][Game.cursor_x]
             if not target_tile.explored:
                 Game.log.append("You can not blink on a unexplored tile.")
@@ -1642,6 +1669,24 @@ class Viewer():
         x,y = pixelcoordinate
         return (x - self.pcx) // Viewer.grid_size[0]  , (y-self.pcy) // Viewer.grid_size[1]
 
+    def explosion_at_tile(self, startpos, color=None, frags=None, minspeed=None, maxspeed=None, age=-2):
+        x,y = self.tile_to_pixel(startpos)
+        x += Viewer.grid_size[0] // 2
+        y += Viewer.grid_size[1] // 2
+        for _ in range(50 if frags is None else frags):
+            mo = pygame.math.Vector2(random.randint(5 if minspeed is None else minspeed,
+                                                    250 if maxspeed is None else maxspeed),0)
+            mo.rotate_ip(random.randint(0,360))
+            duration = random.random() * 1.5 + 0.5 # between half and 2 seconds
+            if color is None:
+                color = (50,50,random.randint(200,255)) # light blue?
+            c = (minmax(color[0], 0, 255),
+                 minmax(color[1], 0, 255),
+                 minmax(color[2], 0, 255))
+            Fragment(pos=pygame.math.Vector2(x,y), move = mo,
+                     max_age = duration, age = age, color=c,
+                     kill_on_edge = True)
+
 
     def tile_to_pixel(self, pos):
         """get a tile coordinate and returns pixel coordinate"""
@@ -2076,7 +2121,7 @@ class Viewer():
 
         tilex, tiley = Game.cursor_x,  Game.cursor_y
         ##print("cursor is at ", tilex, tiley, "=", self.tile_to_pixel(tilex, tiley))
-        print("tile:", tilex, tiley)
+        ##print("tile:", tilex, tiley)
         t = Game.dungeon[self.game.player.z][tiley][tilex]
 
         write(self.panelscreen, text="x:{} y:{} turn:{}".format(tilex, tiley, self.game.turn), x=5, y=95,
@@ -2172,13 +2217,14 @@ class Viewer():
             # print(monster, monster.y, monster.x)
             if Game.fov_map[monster.y][monster.x] and distance < monster.arrow_range:
                 ## FlyObject (start, end)
-                start, end, victimpos = self.game.other_arrow((monster.x, monster.y),
+                end, victim = self.game.other_arrow((monster.x, monster.y),
                                                               (self.game.player.x, self.game.player.y))
-                a = MagicSprite(startpos=self.tile_to_pixel(start), endpos=self.tile_to_pixel(end))
+                a = MagicSprite(startpos=self.tile_to_pixel((monster.x,monster.y)), endpos=self.tile_to_pixel(end))
                 if self.playtime + a.duration > self.animation:
                     self.animation = self.playtime + a.duration
-                if victimpos is not None:
-                    pass  # todo victim impact animation
+                if victim is not None:
+                    self.explosion_at_tile(startpos=(self.game.player.x, self.game.player.y),
+                                           color=(200,0,0),minspeed=1, maxspeed=100)
 
         self.animate_sprites_only()
 
@@ -2203,6 +2249,7 @@ class Viewer():
             self.allgroup.clear(self.screen, self.spriteless_background)
             self.allgroup.update(seconds)
             self.allgroup.draw(self.screen)
+            self.draw_panel() # TODO: remove? Fragments destroy panel otherwise. making area for Fragment sprite?
             pygame.display.update()
 
     def run(self):
@@ -2285,7 +2332,19 @@ class Viewer():
                     if event.mod & pygame.KMOD_CTRL:  # any or both ctrl keys are pressed
                         key = pygame.key.name(event.key)  # name of event key: a, b, c etc.
                         spell = self.game.player.spell_from_key(key)  # get the spell that is currently bond to this key
-                        if self.game.cast(spell):  # sucessfull casting -> new turn
+                        result =  self.game.cast(spell)  # sucessfull casting -> new turn
+                        # --- spell animations ----
+                        if spell == "magic missile":
+                            end, victim = result
+                            a = MagicSprite(startpos=(self.pcx, self.pcy), endpos=self.tile_to_pixel(end))
+                            self.animation = self.playtime + a.duration
+                            if victim is not None:
+                                self.explosion_at_tile((victim.x, victim.y), age=-a.duration)
+                            self.animate_sprites_only()
+
+
+
+                        if result:
                             self.new_turn()
 
                     # ---- -simple player movement with cursor keys -------
@@ -2344,9 +2403,9 @@ class Viewer():
 
                     if event.key == pygame.K_f:
                         # fire arrow to cursor
-                        start, end, victimpos = self.game.player_arrow()  # None , None, None  when player can not shoot, otherwise startpos, endpos, victim
-                        if start is not None:
-                            a = ArrowSprite(startpos=self.tile_to_pixel(start), endpos=self.tile_to_pixel(end))
+                        end, victimpos = self.game.player_arrow()  # None , None, None  when player can not shoot, otherwise startpos, endpos, victim
+                        if end is not None:
+                            a = ArrowSprite(startpos=(self.pcx, self.pcy), endpos=self.tile_to_pixel(end))
                             self.animation = self.playtime + a.duration
                             if victimpos is not None:
                                 pass  # todo victim impact animation
