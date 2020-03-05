@@ -234,18 +234,13 @@ class Flytext(VectorSprite):
             self.move *= self.max_speed
         VectorSprite.update(self, seconds)
 
-
-class ArrowSprite(VectorSprite):
-    """ a sprite flying from startpos to endpos with fixed speed
-        startpos and endpos are in pixel
-    """
-    image = None
+class FlyingObject(VectorSprite):
+    image = None  # will be set from Viewer.create_tiles
 
     def _overwrite_parameters(self):
-        super()._overwrite_parameters()  # empty
-        self.speed = 150  # pixel / second
+
         self.move = pygame.math.Vector2(self.endpos[0] - self.startpos[0], self.endpos[1] - self.startpos[1])
-        self.picture = ArrowSprite.image
+        self.picture = self.image
         self.create_image()
         distance = self.max_distance = self.move.length()
         if distance > 0:
@@ -257,11 +252,35 @@ class ArrowSprite(VectorSprite):
         # arrow shall start in the middle of tile, not in the topleft corner
         self.pos = pygame.math.Vector2(self.startpos[0] + Viewer.grid_size[0] // 2,
                                        self.startpos[1] + Viewer.grid_size[1] // 2)
-        # self.image = pygame.transform.rotate(self.image,
-        #                                self.move.angle_to(pygame.math.Vector2(1, 0)))
-        # self.image.convert_alpha()
-        ## WEITERMACHEN SETANGLE ? (pfeil schaut derzeit nur nach rechts)
+
         self.set_angle(self.move.angle_to(pygame.math.Vector2(1, 0)))
+
+
+class ArrowSprite(FlyingObject):
+    """ a sprite flying from startpos to endpos with fixed speed
+        startpos and endpos are in pixel
+    """
+    image = None
+
+    def _overwrite_parameters(self):
+        self.speed = 150  # pixel / second
+        super()._overwrite_parameters()  # FlyingObject
+
+
+class MagicSprite(FlyingObject):
+    """ a sprite flying from startpos to endpos with fixed speed
+            startpos and endpos are in pixel
+        """
+    image = None
+
+    def _overwrite_parameters(self):
+        self.speed = 50  # pixel / second
+        super()._overwrite_parameters()  # FlyingObject
+
+    def update(self, seconds):
+        # rotate image
+        self.set_angle(self.angle + 10)
+        super().update(seconds)
 
 
 class NaturalWeapon():
@@ -1710,6 +1729,7 @@ class Viewer():
         ArrowSprite.image = pygame.Surface.subsurface(main_img, (808, 224, 22, 7))
         # self.arrow_tiles = ( pygame.Surface.subsurface(main_img, (808,224,22,7)),
         #                     pygame.Surface.subsurface(main_dark_img, (808,224,22,7)))
+        MagicSprite.image = pygame.Surface.subsurface(main_img, (404,840,19,20)) # magic missile, orange rectangle
 
         self.legend = {"@": self.player_tiles,
                        " ": self.unknown_tile,
@@ -2082,7 +2102,7 @@ class Viewer():
                 ## FlyObject (start, end)
                 start, end, victimpos = self.game.other_arrow((monster.x, monster.y),
                                                               (self.game.player.x, self.game.player.y))
-                a = ArrowSprite(startpos=self.tile_to_pixel(start), endpos=self.tile_to_pixel(end))
+                a = MagicSprite(startpos=self.tile_to_pixel(start), endpos=self.tile_to_pixel(end))
                 if self.playtime + a.duration > self.animation:
                     self.animation = self.playtime + a.duration
                 if victimpos is not None:
