@@ -263,7 +263,7 @@ class ArrowSprite(FlyingObject):
     image = None
 
     def _overwrite_parameters(self):
-        self.speed = 150  # pixel / second
+        self.speed = 200  # pixel / second
         super()._overwrite_parameters()  # FlyingObject
 
 
@@ -274,7 +274,7 @@ class MagicSprite(FlyingObject):
     image = None
 
     def _overwrite_parameters(self):
-        self.speed = 50  # pixel / second
+        self.speed = 150  # pixel / second
         super()._overwrite_parameters()  # FlyingObject
 
     def update(self, seconds):
@@ -384,9 +384,9 @@ def megaroll(dicestring="1d6 1d20", bonus=0):
     re-roll: 1D6 means that when hightest side (6) is rolled, 5 (=6-1) is added and he rolls again"""
     dlist = dicestring.split(" ")
     total = 0
-    print("calculating: ", dicestring, "+", bonus)
+    #print("calculating: ", dicestring, "+", bonus)
     for code in dlist:
-        print("---processing", code)
+        #print("---processing", code)
         if "d" in code:
             # reroll = False
             rolls = int(code.split("d")[0])
@@ -399,8 +399,8 @@ def megaroll(dicestring="1d6 1d20", bonus=0):
             total += roll((rolls, sides), bonus=0, reroll=True)
         else:
             raise SystemError("unknow dice type: {} use 1d6, 1D20 etc".format(code))
-        print("---result of", code, "is :", str(total))
-    print("adding " + str(bonus) + "=", str(total + bonus))
+        #print("---result of", code, "is :", str(total))
+    #print("adding " + str(bonus) + "=", str(total + bonus))
     return total + bonus
 
 
@@ -415,9 +415,9 @@ def roll(dice, bonus=0, reroll=True):
     rolls = dice[0]
     sides = dice[1]
     total = 0
-    print("------------------------")
-    print("rolling {}{}{} + bonus {}".format(rolls, "D" if reroll else "d", sides, bonus))
-    print("------------------------")
+    #print("------------------------")
+    #print("rolling {}{}{} + bonus {}".format(rolls, "D" if reroll else "d", sides, bonus))
+    #print("------------------------")
     i = 0
     verb = "rolls   "
     # for d in range(rolls):
@@ -429,20 +429,20 @@ def roll(dice, bonus=0, reroll=True):
 
         if reroll and value == sides:
             total += value - 1
-            print("die #{} {} {}  ∑: {} (count as {} and rolls again)".format(i, verb, value, total, value - 1))
+            #print("die #{} {} {}  ∑: {} (count as {} and rolls again)".format(i, verb, value, total, value - 1))
             verb = "re-rolls"
             i -= 1
             continue
         else:
             total += value
-            print("die #{} {} {}  ∑: {}".format(i, verb, value, total))
+            #print("die #{} {} {}  ∑: {}".format(i, verb, value, total))
             verb = "rolls   "
 
-    print("=========================")
-    print("=result:    {}".format(total))
-    print("+bonus:     {}".format(bonus))
-    print("=========================")
-    print("=total:     {}".format(total + bonus))
+    #print("=========================")
+    #print("=result:    {}".format(total))
+    #print("+bonus:     {}".format(bonus))
+    #print("=========================")
+    #print("=total:     {}".format(total + bonus))
     return total + bonus
 
 
@@ -770,13 +770,13 @@ class Monster(Object):
         try:
             target = Game.dungeon[self.z][self.y + dy][self.x + dx]
         except:
-            print("monster trying illegally to leave dungeon")
+            #print("monster trying illegally to leave dungeon")
             return 0, 0
             ##raise SystemError("out of dungeon?", self.x, self.y, self.z)
         if target.block_movement:
-            print("monster trying to move into a wall")
+            #print("monster trying to move into a wall")
             return 0, 0
-        print("dx dy", self.__class__.__name__, dx, dy)
+        #print("dx dy", self.__class__.__name__, dx, dy)
         return dx, dy
 
     def move(self, dx, dy, dz=0):
@@ -945,6 +945,7 @@ class Game():
             Scroll(4, 6, 0)
 
         self.levelmonsters = [Snake,Wolf, Yeti, Dragon ]
+        self.lootlist = [Gold, Arrows, Scroll]
         # Scroll(4, 5, 0)
         self.log.append("Welcome to the first dungeon level (level 0)!")
         self.log.append("Use cursor keys to move around")
@@ -1122,15 +1123,15 @@ class Game():
     def strike(self, a, b):
         # print("{} strikes at {}".format(a, b))
         # Game.log.append("{} strikes at {}".format(a.__class__.__name__, b.__class__.__name__))
-        print("----strike test -----")
-        print("{} strikes at {}".format(a.__class__.__name__, b.__class__.__name__))
+        #print("----strike test -----")
+        #print("{} strikes at {}".format(a.__class__.__name__, b.__class__.__name__))
         wa = random.choice(a.natural_weapons)
-        print("{} attacks with {} ".format(a.__class__.__name__, wa.__class__.__name__))
+        #print("{} attacks with {} ".format(a.__class__.__name__, wa.__class__.__name__))
         attack_value = roll(a.attack, wa.attack_bonus)
         wd = random.choice(b.natural_weapons)
-        print("{} defense with {} ".format(b.__class__.__name__, wd.__class__.__name__))
+        #print("{} defense with {} ".format(b.__class__.__name__, wd.__class__.__name__))
         defense_value = roll(b.defense, wd.defense_bonus)
-        print(attack_value, defense_value)
+        #print(attack_value, defense_value)
         if attack_value > defense_value:
             damage_value = roll(a.damage, wa.damage_bonus)
             b.hitpoints -= damage_value
@@ -1356,12 +1357,9 @@ class Game():
         """each floor tile has a small chance to spawn loot"""
         for y, line in enumerate(Game.dungeon[z]):
             for x, tile in enumerate(line):
-                if tile.char == ".":
-                    if random.random() < 0.01:
-                        if random.random() < 0.5:
-                            Gold(x,y,z)
-                        else:
-                            Arrows(x,y,z)
+                if tile.char == "." and random.random() < 0.01:
+                    loot = random.choice(self.lootlist)
+                    loot(x,y,z)
 
     def use_stairs(self):
         """go up or done one dungeon level, depending on stair"""
@@ -2194,7 +2192,14 @@ class Viewer():
             milliseconds = self.clock.tick(self.fps)  #
             seconds = milliseconds / 1000
             self.playtime += seconds
-
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    #running = False
+                    return
+                # ------- pressed and released key ------
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        return # running = False
             self.allgroup.clear(self.screen, self.spriteless_background)
             self.allgroup.update(seconds)
             self.allgroup.draw(self.screen)
@@ -2361,7 +2366,7 @@ class Viewer():
                             # zoom out radar
                             self.radarblipsize *= 0.5
                             self.radarblipsize = int(max(1, self.radarblipsize))  # don't become zero
-                            print("radarblip:", self.radarblipsize)
+                            #print("radarblip:", self.radarblipsize)
                             self.redraw = True
                         else:
                             # more torch radius
