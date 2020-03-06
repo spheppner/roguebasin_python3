@@ -337,19 +337,26 @@ class ArrowSprite(FlyingObject):
 
 
 class MagicSprite(FlyingObject):
-    """ a sprite flying from startpos to endpos with fixed speed
-            startpos and endpos are in pixel
-        """
-    image = None
+    """ a blue magic missile, usually shot from player"""
+    image = None # will be overwritten by Viewer.create_tiles
 
     def _overwrite_parameters(self):
-        self.speed = 150  # pixel / second
+        self.speed = 200  # pixel / second
         super()._overwrite_parameters()  # FlyingObject
 
     def update(self, seconds):
-        # rotate image
-        self.set_angle(self.angle + 10)
+        self.set_angle(self.angle + 10) # rotate image in flight
         super().update(seconds)
+
+class DragonFireSprite(Flytext):
+    """dragon missile"""
+    def _overwrite_parameters(self):
+        self.speed = 150  # pixel / second
+        super()._overwrite_parameters()  # FlyingObject
+    # TODO WEITERMACHEN
+
+
+
 
 
 class NaturalWeapon():
@@ -2301,7 +2308,7 @@ class Viewer():
 
         for monster in [o for o in Game.objects.values() if
                         o != self.game.player and o.z == self.game.player.z and
-                        isinstance(o, Monster) and o.shoot_arrows]:
+                        isinstance(o, Monster) and o.shoot_arrows and o.hitpoints>0]:
             # calculate distance to player
             distance = ((monster.x - self.game.player.x) ** 2 + (monster.y - self.game.player.y) ** 2) ** 0.5
             # monster shoots at you if it can, player is in shooting range and player sees monster
