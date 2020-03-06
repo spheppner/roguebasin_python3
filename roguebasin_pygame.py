@@ -229,6 +229,16 @@ class VectorSprite(pygame.sprite.Sprite):
             elif self.warp_on_edge:
                 self.pos.y = 0
 
+
+class HealingSprite(VectorSprite):
+
+    image = None
+
+    def _overwrite_parameters(self):
+        super()._overwrite_parameters()
+        self.picture = self.image
+        self.create_image()
+
 class BleedingSprite(VectorSprite):
 
     image = None
@@ -238,6 +248,7 @@ class BleedingSprite(VectorSprite):
         self.picture = self.image
         self.create_image()
         self.zoom = 1.0
+
         self.rotation = 0
         self.pos += pygame.math.Vector2(Viewer.grid_size[0]//2, Viewer.grid_size[1]//2)
         self.image0 = self.image.copy()
@@ -245,12 +256,16 @@ class BleedingSprite(VectorSprite):
     def update(self, seconds):
         super().update(seconds)
         oldcenter = self.rect.center
-        self.zoom += 0.1
+        self.zoom += self.zoom_delta
         self.rotation += 0
         self.image = pygame.transform.rotozoom(self.image0, self.rotation, self.zoom)
         self.image.convert_alpha()
         self.rect = self.image.get_rect()
         self.rect.center = oldcenter
+
+class BlinkSprite(BleedingSprite):
+
+    image = None
 
 class FragmentSprite(VectorSprite):
 
@@ -755,7 +770,7 @@ class Scroll(Item):
                                     "bleed", "bleed","bleed", "bleed","bleed", "bleed",
                                     "magic map", "magic map", "magic map",
                                     "magic missile", "magic missile", "magic missile",
-                                    "fireball", "fear",))
+                                    "fireball", "heal","heal","heal","heal"))
         # disarm onfuse hurt bleed combat bless defense bless bull strenght dragon strenght superman
 
 
@@ -1232,6 +1247,12 @@ class Game():
             self.consume_scroll(spell)
             return True
 
+        elif spell == "heal":
+            self.consume_scroll(spell)
+            self.log.append("your healing spell gives you +20 hp")
+            self.player.hitpoints += 20 # TODO: max_hp ?
+            return True
+
         # ----- spells that need a cursor position different from player position ---
         if Game.cursor_y == self.player.y and Game.cursor_x == self.player.x:
             Game.log.append("you must select another tile with the mouse before casting {}".format(spell))
@@ -1276,10 +1297,10 @@ class Game():
                         isinstance(o, Monster) and o.hitpoints > 0):
                     Game.log.append("You can not blink on top of a monster")
                     return False
-
+            old = (self.player.x, self.player.y)
             self.move_player(Game.cursor_x-self.player.x, Game.cursor_y-self.player.y)
             self.consume_scroll(spell)
-            return True
+            return old # success
 
     def load_level(self, z, name, folder="data"):
         """load a text file and return a list of non-empty lines without newline characters"""
@@ -1907,6 +1928,9 @@ class Viewer():
         #                     pygame.Surface.subsurface(main_dark_img, (808,224,22,7)))
         MagicSprite.image = pygame.Surface.subsurface(main_img, (76,841,13,12)) # magic missile, orange rectangle
         BleedingSprite.image = pygame.Surface.subsurface(feats_img, (248,160,32,22))#(717,417,29,25))
+        BlinkSprite.image = pygame.Surface.subsurface(feats_img, (0,384,30,32))
+        HealingSprite.image = pygame.Surface.subsurface(main_img, (158,381,15,15))
+
         self.legend = {"@": self.player_tiles,
                        " ": self.unknown_tile,
                        "<": self.stair_up_tiles,
@@ -2415,13 +2439,30 @@ class Viewer():
                             if victim is not None:
                                 self.explosion_at_tile((victim.x, victim.y), age=-a.duration)
                             self.animate_sprites_only()
+                        elif spell == "heal":
+                            if result:
+                                for _ in range(15):
+                                    p = pygame.math.Vector2(self.pcx + Viewer.grid_size[0]//2 + random.randint(-20,20),
+                                                            self.pcy + Viewer.grid_size[1])
+                                    m = pygame.math.Vector2(0, -random.random()* 15 -3)
+                                    a = random.random() * -1.5
+                                    HealingSprite(pos=p, move=m, age=a, max_age=2)
+
+
                         elif spell == "bleed":
                             if result:
                                 # play blood animation for 1 second at victimtile (result)
                                 duration = 0.45
-                                BleedingSprite(pos=pygame.math.Vector2(self.tile_to_pixel(result)), max_age=duration)
+                                BleedingSprite(pos=pygame.math.Vector2(self.tile_to_pixel(result)), max_age=duration, zoom_delta = 0.1)
                                 self.animation = self.playtime + duration
                                 self.animate_sprites_only()
+
+                        elif spell == "blink":
+                            if result: # result old position
+                                BlinkSprite(pos=pygame.math.Vector2(self.tile_to_pixel(result)), zoom_delta = -0.008, max_age=2) # shrink
+                                BlinkSprite(pos=pygame.math.Vector2(self.pcx+Viewer.grid_size[0], self.pcy), zoom_delta= 0.005,
+                                            max_age=1.4)
+
 
 
                         if result:
