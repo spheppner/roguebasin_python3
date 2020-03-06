@@ -1905,7 +1905,7 @@ class Viewer():
         ArrowSprite.image = pygame.Surface.subsurface(main_img, (808, 224, 22, 7))
         # self.arrow_tiles = ( pygame.Surface.subsurface(main_img, (808,224,22,7)),
         #                     pygame.Surface.subsurface(main_dark_img, (808,224,22,7)))
-        MagicSprite.image = pygame.Surface.subsurface(main_img, (404,840,19,20)) # magic missile, orange rectangle
+        MagicSprite.image = pygame.Surface.subsurface(main_img, (76,841,13,12)) # magic missile, orange rectangle
         BleedingSprite.image = pygame.Surface.subsurface(feats_img, (248,160,32,22))#(717,417,29,25))
         self.legend = {"@": self.player_tiles,
                        " ": self.unknown_tile,
