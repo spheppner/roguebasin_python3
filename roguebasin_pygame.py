@@ -1,5 +1,7 @@
 """
 author: Horst JENS
+"""
+author: Horst JENS
 email: horstjens@gmail.com
 contact: see http://spielend-programmieren.at/de:kontakt
 license: gpl, see http://www.gnu.org/licenses/gpl-3.0.de.html
@@ -23,13 +25,15 @@ import os
 # declare constants
 ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-
+# TODO: class Item: image wie bei Sprites in die class. layer
 #  TODO monster speed > 1 tile possible ?
 #  TODO rework NaturalWeapon
 #  TODO Item
 #  TODO Equipment
 #  TODO Consumable
 # TODO: blood after impact on floor (feat.png, 58,384,22,32.....
+# TODO: hilight mouse-path for shooting, / Fireball
+
 
 
 class VectorSprite(pygame.sprite.Sprite):
@@ -226,7 +230,7 @@ class VectorSprite(pygame.sprite.Sprite):
             elif self.warp_on_edge:
                 self.pos.y = 0
 
-class Bleeding(VectorSprite):
+class BleedingSprite(VectorSprite):
 
     image = None
 
@@ -243,7 +247,7 @@ class Bleeding(VectorSprite):
         self.rect = self.image.get_rect()
         self.rect.center = oldcenter
 
-class Fragment(VectorSprite):
+class FragmentSprite(VectorSprite):
 
     def _overwrite_parameters(self):
         super()._overwrite_parameters()
@@ -963,6 +967,7 @@ class Game():
     game_over = False
     cursor_x = 0  # absolute coordinate, tile
     cursor_y = 0
+    player = None
 
     # friend_image = "arch-mage-idle"
     # foe_image = None
@@ -971,7 +976,7 @@ class Game():
         Game.tiles_x = tiles_x  # max. width of the level in tiles
         Game.tiles_y = tiles_y  # max. height of the level in tiles, top row is 0, second row is 1 etc.
         # self.checked = set()   # like a list, but without duplicates. for fov calculation
-        self.player = Player(x=1, y=1, z=0)
+        Game.player = Player(x=1, y=1, z=0)
         Game.cursor_x = self.player.x
         Game.cursor_y = self.player.y
         # Monster(2,2,0)
@@ -984,6 +989,8 @@ class Game():
         Dragon(31, 4, 0)
         Shop(7, 1, 0)
         Gold(2, 1, 0)
+        Gold(3,1,0)
+        Gold(4,1,0)
         for _ in range(15):
             Scroll(4, 4, 0)
             Scroll(5, 4, 0)
@@ -1035,6 +1042,7 @@ class Game():
                     self.player.gold += o.value
                     # kill gold from dungeon
                     del Game.objects[o.number]
+
 
                 elif isinstance(o, Arrows):
                     Game.log.append("You found {} arrows!".format(o.quantity))
@@ -1711,8 +1719,9 @@ class Viewer():
         x,y = pixelcoordinate
         return (x - self.pcx) // Viewer.grid_size[0]  , (y-self.pcy) // Viewer.grid_size[1]
 
-    def explosion_at_tile(self, startpos, color=None, frags=None, minspeed=None, maxspeed=None, age=-2):
-        x,y = self.tile_to_pixel(startpos)
+    @staticmethod
+    def explosion_at_tile(startpos, color=None, frags=None, minspeed=None, maxspeed=None, age=-2, gravity=None):
+        x,y = Viewer.tile_to_pixel(startpos)
         x += Viewer.grid_size[0] // 2
         y += Viewer.grid_size[1] // 2
         for _ in range(50 if frags is None else frags):
@@ -1725,16 +1734,23 @@ class Viewer():
             c = (minmax(color[0], 0, 255),
                  minmax(color[1], 0, 255),
                  minmax(color[2], 0, 255))
-            Fragment(pos=pygame.math.Vector2(x,y), move = mo,
+            FragmentSprite(pos=pygame.math.Vector2(x,y), move = mo,
                      max_age = duration, age = age, color=c,
-                     kill_on_edge = True)
+                     kill_on_edge = True, gravity=gravity)
 
-
-    def tile_to_pixel(self, pos):
-        """get a tile coordinate and returns pixel coordinate"""
-        x, y = pos
-        x2 = self.pcx + (x - self.game.player.x) * Viewer.grid_size[0]
-        y2 = self.pcy + (y - self.game.player.y) * Viewer.grid_size[1]
+    # can be accessed from everywhere
+    #def tile_to_pixel(elf, pos):
+    #    """get a tile coordinate and returns pixel coordinate"""
+    #    x, y = pos
+    #    x2 = self.pcx + (x - self.game.player.x) * Viewer.grid_size[0]
+    #    y2 = self.pcy + (y - self.game.player.y) * Viewer.grid_size[1]
+    #    return (x2, y2)
+    @staticmethod
+    def tile_to_pixel(pos):
+        """get a tile (x,y) and a reference to the player and returns pixel (x,y) of tile """
+        x,y = pos
+        x2 = Viewer.pcx + (x - Game.player.x) * Viewer.grid_size[0]
+        y2 = Viewer.pcy + (y - Game.player.y) * Viewer.grid_size[1]
         return (x2, y2)
 
     def load_images(self):
@@ -1885,7 +1901,7 @@ class Viewer():
         # self.arrow_tiles = ( pygame.Surface.subsurface(main_img, (808,224,22,7)),
         #                     pygame.Surface.subsurface(main_dark_img, (808,224,22,7)))
         MagicSprite.image = pygame.Surface.subsurface(main_img, (404,840,19,20)) # magic missile, orange rectangle
-        Bleeding.image = pygame.Surface.subsurface(feats_img, (717,417,29,25))
+        BleedingSprite.image = pygame.Surface.subsurface(feats_img, (717,417,29,25))
         self.legend = {"@": self.player_tiles,
                        " ": self.unknown_tile,
                        "<": self.stair_up_tiles,
@@ -2269,9 +2285,15 @@ class Viewer():
 
 
         self.animate_sprites_only()
+
         self.draw_panel()  # to update player hitpoints
 
+        old_gold = self.game.player.gold
         self.game.new_turn()
+        delta_gold = self.game.player.gold - old_gold
+        if delta_gold > 0:
+            self.explosion_at_tile(startpos=(self.game.player.x, self.game.player.y),
+                                     frags=delta_gold, minspeed=10, maxspeed=50, gravity="gold")
         self.redraw = True
         # self.redraw = True
 
@@ -2387,7 +2409,7 @@ class Viewer():
                         elif spell == "bleed":
                             if result:
                                 # play blood animation for 1 second at victimtile (result)
-                                Bleeding(pos=pygame.math.Vector2(self.tile_to_pixel(result)), max_age=0.5)
+                                BleedingSprite(pos=pygame.math.Vector2(self.tile_to_pixel(result)), max_age=0.5)
                                 self.animation = self.playtime + 1.0
                                 self.animate_sprites_only()
 
