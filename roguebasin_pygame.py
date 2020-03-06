@@ -1,5 +1,6 @@
 """
 author: Horst JENS
+author: Horst JENS
 email: horstjens@gmail.com
 contact: see http://spielend-programmieren.at/de:kontakt
 license: gpl, see http://www.gnu.org/licenses/gpl-3.0.de.html
@@ -12,8 +13,8 @@ see http://www.roguebasin.com/index.php?title=Comparative_study_of_field_of_view
 
 field of view improving, removing of artifacts:
 see https://sites.google.com/site/jicenospam/visibilitydetermination
-
 """
+
 import pygame
 import random
 # import inspect
@@ -236,11 +237,17 @@ class BleedingSprite(VectorSprite):
         super()._overwrite_parameters()
         self.picture = self.image
         self.create_image()
+        self.zoom = 1.0
+        self.rotation = 0
+        self.pos += pygame.math.Vector2(Viewer.grid_size[0]//2, Viewer.grid_size[1]//2)
+        self.image0 = self.image.copy()
 
     def update(self, seconds):
         super().update(seconds)
         oldcenter = self.rect.center
-        self.image = pygame.transform.rotozoom(self.image, 0, 1.091)
+        self.zoom += 0.1
+        self.rotation += 0
+        self.image = pygame.transform.rotozoom(self.image0, self.rotation, self.zoom)
         self.image.convert_alpha()
         self.rect = self.image.get_rect()
         self.rect.center = oldcenter
@@ -1899,7 +1906,7 @@ class Viewer():
         # self.arrow_tiles = ( pygame.Surface.subsurface(main_img, (808,224,22,7)),
         #                     pygame.Surface.subsurface(main_dark_img, (808,224,22,7)))
         MagicSprite.image = pygame.Surface.subsurface(main_img, (404,840,19,20)) # magic missile, orange rectangle
-        BleedingSprite.image = pygame.Surface.subsurface(feats_img, (717,417,29,25))
+        BleedingSprite.image = pygame.Surface.subsurface(feats_img, (248,160,32,22))#(717,417,29,25))
         self.legend = {"@": self.player_tiles,
                        " ": self.unknown_tile,
                        "<": self.stair_up_tiles,
@@ -2411,8 +2418,9 @@ class Viewer():
                         elif spell == "bleed":
                             if result:
                                 # play blood animation for 1 second at victimtile (result)
-                                BleedingSprite(pos=pygame.math.Vector2(self.tile_to_pixel(result)), max_age=0.5)
-                                self.animation = self.playtime + 1.0
+                                duration = 0.45
+                                BleedingSprite(pos=pygame.math.Vector2(self.tile_to_pixel(result)), max_age=duration)
+                                self.animation = self.playtime + duration
                                 self.animate_sprites_only()
 
 
