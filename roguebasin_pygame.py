@@ -2210,7 +2210,11 @@ class Viewer():
         for dy, thing in enumerate(here):
             # -y135 + 20*dy
             # TODO: blit text in variable fontsize/panel width with word wrap
-            write(self.panelscreen, text=Game.legend[thing.char], x=5, y=135 + 20 * dy, color=(255, 255, 255),
+            if isinstance(thing, Monster):
+                t = Game.legend[thing.char] + " {} hp".format(thing.hitpoints)
+            else:
+                t = Game.legend[thing.char]
+            write(self.panelscreen, text=t, x=5, y=135 + 20 * dy, color=(255, 255, 255),
                   font_size=16)
 
         # --- print hints ----
