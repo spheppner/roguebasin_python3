@@ -2424,112 +2424,109 @@ class Viewer():
                                 self.animate_sprites_only()
 
 
-
-
-
-
-
                         if result:
                             self.new_turn()
+                    # --- end of spellcasting, no CTRL key is pressed ---
+                    else:
 
-                    # ---- -simple player movement with cursor keys -------
-                    if event.key in (pygame.K_RIGHT, pygame.K_KP6):
-                        self.new_turn()
-                        self.game.move_player(1, 0)
-
-                    if event.key in (pygame.K_LEFT, pygame.K_KP4):
-                        self.new_turn()
-                        self.game.move_player(-1, 0)
-
-                    if event.key in (pygame.K_UP, pygame.K_KP8):
-                        self.new_turn()
-                        self.game.move_player(0, -1)
-
-                    if event.key in (pygame.K_DOWN, pygame.K_KP2):
-                        self.new_turn()
-                        self.game.move_player(0, 1)
-
-                    # --- diagonal movement ---
-                    if event.key in (pygame.K_KP7, pygame.K_HOME):
-                        self.new_turn()
-                        self.game.move_player(-1, -1)
-
-                    if event.key in (pygame.K_KP9, pygame.K_PAGEUP):
-                        self.new_turn()
-                        self.game.move_player(1, -1)
-
-                    if event.key in (pygame.K_KP1, pygame.K_END):
-                        self.new_turn()
-                        self.game.move_player(-1, 1)
-
-                    if event.key in (pygame.K_KP3, pygame.K_PAGEDOWN):
-                        self.new_turn()
-                        self.game.move_player(1, 1)
-
-                    if event.key == pygame.K_SPACE:
-                        # Game.turn += 1  # wait a turn
-                        self.new_turn()
-                        # on shop buy 10 hp for one gold
-                        for o in Game.objects.values():
-                            if (o.z == self.game.player.z and
-                                    o.x == self.game.player.x and
-                                    o.y == self.game.player.y and
-                                    self.game.player.gold > 0 and
-                                    isinstance(o, Shop)):
-                                # and o.__class__.__name__=="Shop"):
-                                self.game.player.gold -= 1
-                                self.game.player.hitpoints += 10
-
-                        self.redraw = True
-
-                    if event.key == pygame.K_x:
-                        Flytext(text="Hallo Horst", pos=pygame.math.Vector2(300, 300), move=pygame.math.Vector2(0, -10),
-                                max_age=15)
-
-                    if event.key == pygame.K_f:
-                        # fire arrow to cursor
-                        end, victimpos = self.game.player_arrow()  # None , None, None  when player can not shoot, otherwise startpos, endpos, victim
-                        if end is not None:
-                            a = ArrowSprite(startpos=(self.pcx, self.pcy), endpos=self.tile_to_pixel(end))
-                            self.animation = self.playtime + a.duration
-                            if victimpos is not None:
-                                pass  # todo victim impact animation
-
-                            self.animate_sprites_only()
+                        # ---- -simple player movement with cursor keys -------
+                        if event.key in (pygame.K_RIGHT, pygame.K_KP6):
                             self.new_turn()
+                            self.game.move_player(1, 0)
 
-                    if event.key in (pygame.K_LESS, pygame.K_GREATER):
-                        self.new_turn()
-                        # go up a level
-                        if self.game.use_stairs():
-                            self.redraw = True
-                            self.wall_and_floor_theme()  # new walls and floor colors
+                        if event.key in (pygame.K_LEFT, pygame.K_KP4):
+                            self.new_turn()
+                            self.game.move_player(-1, 0)
 
-                    if event.key == pygame.K_PLUS:
-                        if event.mod & pygame.KMOD_CTRL:
-                            # zoom out radar
-                            self.radarblipsize *= 0.5
-                            self.radarblipsize = int(max(1, self.radarblipsize))  # don't become zero
-                            #print("radarblip:", self.radarblipsize)
-                            self.redraw = True
-                        else:
-                            # more torch radius
-                            Game.torch_radius += 1
-                            self.game.make_fov_map()
+                        if event.key in (pygame.K_UP, pygame.K_KP8):
+                            self.new_turn()
+                            self.game.move_player(0, -1)
+
+                        if event.key in (pygame.K_DOWN, pygame.K_KP2):
+                            self.new_turn()
+                            self.game.move_player(0, 1)
+
+                        # --- diagonal movement ---
+                        if event.key in (pygame.K_KP7, pygame.K_HOME):
+                            self.new_turn()
+                            self.game.move_player(-1, -1)
+
+                        if event.key in (pygame.K_KP9, pygame.K_PAGEUP):
+                            self.new_turn()
+                            self.game.move_player(1, -1)
+
+                        if event.key in (pygame.K_KP1, pygame.K_END):
+                            self.new_turn()
+                            self.game.move_player(-1, 1)
+
+                        if event.key in (pygame.K_KP3, pygame.K_PAGEDOWN):
+                            self.new_turn()
+                            self.game.move_player(1, 1)
+
+                        if event.key == pygame.K_SPACE:
+                            # Game.turn += 1  # wait a turn
+                            self.new_turn()
+                            # on shop buy 10 hp for one gold
+                            for o in Game.objects.values():
+                                if (o.z == self.game.player.z and
+                                        o.x == self.game.player.x and
+                                        o.y == self.game.player.y and
+                                        self.game.player.gold > 0 and
+                                        isinstance(o, Shop)):
+                                    # and o.__class__.__name__=="Shop"):
+                                    self.game.player.gold -= 1
+                                    self.game.player.hitpoints += 10
+
                             self.redraw = True
 
+                        if event.key == pygame.K_x:
+                            Flytext(text="Hallo Horst", pos=pygame.math.Vector2(300, 300), move=pygame.math.Vector2(0, -10),
+                                    max_age=15)
 
-                    if event.key == pygame.K_MINUS:
-                        if event.mod & pygame.KMOD_CTRL:
-                            # zoom in radar
-                            self.radarblipsize *= 2
-                            self.radarblipsize = min(64, self.radarblipsize)  # don't become absurd large
-                            self.redraw = True
-                        else:
-                            # --- decrease torch radius ----
-                            Game.torch_radius -= 1
-                            self.game.make_fov_map()
-                            self.redraw = True
+                        if event.key == pygame.K_f:
+                            # fire arrow to cursor
+                            end, victimpos = self.game.player_arrow()  # None , None, None  when player can not shoot, otherwise startpos, endpos, victim
+                            if end is not None:
+                                a = ArrowSprite(startpos=(self.pcx, self.pcy), endpos=self.tile_to_pixel(end))
+                                self.animation = self.playtime + a.duration
+                                if victimpos is not None:
+                                    pass  # todo victim impact animation
+
+                                self.animate_sprites_only()
+                                self.new_turn()
+
+                        if event.key in (pygame.K_LESS, pygame.K_GREATER):
+                            self.new_turn()
+                            # go up a level
+                            if self.game.use_stairs():
+                                self.redraw = True
+                                self.wall_and_floor_theme()  # new walls and floor colors
+
+                        if event.key == pygame.K_PLUS:
+                            if event.mod & pygame.KMOD_CTRL:
+                                # zoom out radar
+                                self.radarblipsize *= 0.5
+                                self.radarblipsize = int(max(1, self.radarblipsize))  # don't become zero
+                                #print("radarblip:", self.radarblipsize)
+                                self.redraw = True
+                            else:
+                                # more torch radius
+                                Game.torch_radius += 1
+                                self.game.make_fov_map()
+                                self.redraw = True
+
+
+                        if event.key == pygame.K_MINUS:
+                            if event.mod & pygame.KMOD_CTRL:
+                                # zoom in radar
+                                self.radarblipsize *= 2
+                                self.radarblipsize = min(64, self.radarblipsize)  # don't become absurd large
+                                self.redraw = True
+                            else:
+                                # --- decrease torch radius ----
+                                Game.torch_radius -= 1
+                                self.game.make_fov_map()
+                                self.redraw = True
 
             # --- set cursor to mouse if inside play area -----
             x,y =  self.pixel_to_tile(pygame.mouse.get_pos())
