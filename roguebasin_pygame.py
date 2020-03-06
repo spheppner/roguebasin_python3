@@ -23,12 +23,13 @@ import os
 # declare constants
 ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-#TODO: nach magic missle kommt automatisch ein arrow
+
 #  TODO monster speed > 1 tile possible ?
 #  TODO rework NaturalWeapon
 #  TODO Item
 #  TODO Equipment
 #  TODO Consumable
+# TODO: blood after impact on floor (feat.png, 58,384,22,32.....
 
 
 class VectorSprite(pygame.sprite.Sprite):
@@ -67,9 +68,9 @@ class VectorSprite(pygame.sprite.Sprite):
         # if "static" not in kwargs:
         #    self.static = False
         if "pos" not in kwargs:
-            self.pos = pygame.math.Vector2(150, 150)
+            self.pos = pygame.math.Vector2(x=150, y=150)
         if "move" not in kwargs:
-            self.move = pygame.math.Vector2(0, 0)
+            self.move = pygame.math.Vector2(x=0, y=0)
         #if "acceleration" not in kwargs:
         #    self.acc = 0.0 # pixel/second speed is constant
         # TODO: acc, gravity-vector
@@ -174,7 +175,7 @@ class VectorSprite(pygame.sprite.Sprite):
             if self.sticky_with_boss:
                 boss = VectorSprite.numbers[self.bossnumber]
                 # self.pos = v.Vec2d(boss.pos.x, boss.pos.y)
-                self.pos = pygame.math.Vector2(boss.pos.x, boss.pos.y)
+                self.pos = pygame.math.Vector2(x=boss.pos.x, y=boss.pos.y)
         if self.age > 0:
             self.pos += self.move * seconds
             self.distance_traveled += self.move.length() * seconds
@@ -225,10 +226,36 @@ class VectorSprite(pygame.sprite.Sprite):
             elif self.warp_on_edge:
                 self.pos.y = 0
 
+class Bleeding(VectorSprite):
+
+    image = None
+
+    def _overwrite_parameters(self):
+        super()._overwrite_parameters()
+        self.picture = self.image
+        self.create_image()
+
+    def update(self, seconds):
+        super().update(seconds)
+        oldcenter = self.rect.center
+        self.image = pygame.transform.rotozoom(self.image, 0, 1.091)
+        self.image.convert_alpha()
+        self.rect = self.image.get_rect()
+        self.rect.center = oldcenter
 
 class Fragment(VectorSprite):
 
-    pass # TODO update: image.set_alpha(0=full transp, 255=not transp)
+    def _overwrite_parameters(self):
+        super()._overwrite_parameters()
+        self.alpha = 255
+        self.delta_alpha = 255 / self.max_age if self.max_age > 0 else 1
+
+    def update(self, seconds):
+        super().update(seconds)
+        # 0 = full transparency, 255 = no transparency at all
+        self.alpha -= self.delta_alpha * seconds * 0.4 # slowly become more transparent
+        self.image.set_alpha(self.alpha )
+        self.image.convert_alpha()
 
 
 class Flytext(VectorSprite):
@@ -257,7 +284,7 @@ class FlyingObject(VectorSprite):
 
     def _overwrite_parameters(self):
 
-        self.move = pygame.math.Vector2(self.endpos[0] - self.startpos[0], self.endpos[1] - self.startpos[1])
+        self.move = pygame.math.Vector2(x=self.endpos[0] - self.startpos[0], y=self.endpos[1] - self.startpos[1])
         self.picture = self.image
         self.create_image()
         distance = self.max_distance = self.move.length()
@@ -268,10 +295,10 @@ class FlyingObject(VectorSprite):
         self.move *= self.speed  #
         self.duration = distance / self.speed  # in seconds
         # arrow shall start in the middle of tile, not in the topleft corner
-        self.pos = pygame.math.Vector2(self.startpos[0] + Viewer.grid_size[0] // 2,
-                                       self.startpos[1] + Viewer.grid_size[1] // 2)
+        self.pos = pygame.math.Vector2(x= self.startpos[0] + Viewer.grid_size[0] // 2,
+                                       y= self.startpos[1] + Viewer.grid_size[1] // 2)
 
-        self.set_angle(self.move.angle_to(pygame.math.Vector2(1, 0)))
+        self.set_angle(self.move.angle_to(pygame.math.Vector2(x=1, y=0)))
 
 
 class ArrowSprite(FlyingObject):
@@ -471,7 +498,7 @@ def minmax(value, lower_limit=-1, upper_limit=1):
     return value
 
 
-def randomizer(list_of_chances=[1.0,]):
+def randomizer(list_of_chances=(1.0,)):
     """gives back an integer depending on chance.
        e.g. randomizer((.75, 0.15, 0.05, 0.05)) gives in 75% 0, in 15% 1, and in 5% 2 or 3"""
     total = sum(list_of_chances)
@@ -715,11 +742,11 @@ class Scroll(Item):
         self.color = (200, 200, 0)
         self.char = "i"
         self.hint = "consumable magic scroll "
-        self.spell = random.choice(("blink", "blink", "fear", "fear", "bleed", "bleed",
-                                    "bleed", "magic map", "magic map", "magic map", "magic map", "magic map",
-                                    "magic map",
+        self.spell = random.choice(("blink", "blink","blink", "blink",
+                                    "bleed", "bleed","bleed", "bleed","bleed", "bleed",
+                                    "magic map", "magic map", "magic map",
                                     "magic missile", "magic missile", "magic missile",
-                                    "fireball", "fireball", "fireball"))
+                                    "fireball", "fear",))
         # disarm onfuse hurt bleed combat bless defense bless bull strenght dragon strenght superman
 
 
@@ -1174,18 +1201,22 @@ class Game():
         if self.player.hitpoints <= 0:
             Game.game_over = True
 
+    def consume_scroll(self, spell):
+        self.player.scrolls[spell] -= 1
+        self.player.calculate_scroll_list()
+
     def cast(self, spell):
         if spell not in self.player.scrolls or self.player.scrolls[spell] < 1:
             Game.log.append("You have currently no scroll of {}".format(spell))
             return False  # no casting
+
         # ----- spells that need no cursor position at all -----
         if spell == "magic map":
             # make all tiles in this dungeon level explored
             for y, line in enumerate(Game.dungeon[self.player.z]):
                 for x, map_tile in enumerate(line):
                     map_tile.explored = True
-            self.player.scrolls["magic map"] -= 1
-            self.player.calculate_scroll_list()
+            self.consume_scroll(spell)
             return True
 
         # ----- spells that need a cursor position different from player position ---
@@ -1193,14 +1224,26 @@ class Game():
             Game.log.append("you must select another tile with the mouse before casting {}".format(spell))
             return False  # no casting
 
-        if spell == "magic missile":
+        if spell == "bleed":
+            # monster is damaged, as long as it is visible.
+            for monster in [o for o in Game.objects.values() if o.z == self.player.z and
+                            o.y == Game.cursor_y and o.x ==  Game.cursor_x and
+                            isinstance(o, Monster) and o.hitpoints > 0 and
+                            Game.fov_map[o.y][o.x]]:
+                monster.hitpoints -= 20
+                Game.log.append("{} bleeds 20 hitpoints".format(monster.__class__.__name__))
+                self.consume_scroll(spell)
+                return (monster.x,monster.y) # return tile of bleeding
+            return False
+
+
+        elif spell == "magic missile":
             # shoot to Monster at cursor position
-            self.player.scrolls["magic missile"] -= 1
-            self.player.calculate_scroll_list()
+            self.consume_scroll(spell)
+            # TODO check if target is outside line of sight / torchradius
             return  self.other_arrow((self.player.x, self.player.y),
                                     (Game.cursor_x, Game.cursor_y), "magic missile")
-            # return start, end, victim
-
+            # return end, victim
 
         elif spell == "blink":
             # teleport to cursor position
@@ -1216,14 +1259,13 @@ class Game():
                 return False
             for o in Game.objects.values():
                 if (o.z == self.player.z and o.y == Game.cursor_y and
-                        o.x ==  Game.cursor_x and o != self.player and
+                        o.x ==  Game.cursor_x and
                         isinstance(o, Monster) and o.hitpoints > 0):
                     Game.log.append("You can not blink on top of a monster")
                     return False
 
             self.move_player(Game.cursor_x-self.player.x, Game.cursor_y-self.player.y)
-            self.player.scrolls["blink"] -= 1
-            self.player.calculate_scroll_list()
+            self.consume_scroll(spell)
             return True
 
     def load_level(self, z, name, folder="data"):
@@ -1650,7 +1692,7 @@ class Viewer():
         self.wall_and_floor_theme()
 
         self.prepare_spritegroups()
-        self.cursor = CursorSprite(pos=pygame.math.Vector2(Viewer.pcx, Viewer.pcy))
+        self.cursor = CursorSprite(pos=pygame.math.Vector2(x=Viewer.pcx, y=Viewer.pcy))
         self.run()
 
     def prepare_spritegroups(self):
@@ -1674,8 +1716,8 @@ class Viewer():
         x += Viewer.grid_size[0] // 2
         y += Viewer.grid_size[1] // 2
         for _ in range(50 if frags is None else frags):
-            mo = pygame.math.Vector2(random.randint(5 if minspeed is None else minspeed,
-                                                    250 if maxspeed is None else maxspeed),0)
+            mo = pygame.math.Vector2(x=random.randint(5 if minspeed is None else minspeed,
+                                                    150 if maxspeed is None else maxspeed),y =0)
             mo.rotate_ip(random.randint(0,360))
             duration = random.random() * 1.5 + 0.5 # between half and 2 seconds
             if color is None:
@@ -1843,7 +1885,7 @@ class Viewer():
         # self.arrow_tiles = ( pygame.Surface.subsurface(main_img, (808,224,22,7)),
         #                     pygame.Surface.subsurface(main_dark_img, (808,224,22,7)))
         MagicSprite.image = pygame.Surface.subsurface(main_img, (404,840,19,20)) # magic missile, orange rectangle
-
+        Bleeding.image = pygame.Surface.subsurface(feats_img, (717,417,29,25))
         self.legend = {"@": self.player_tiles,
                        " ": self.unknown_tile,
                        "<": self.stair_up_tiles,
@@ -2209,16 +2251,15 @@ class Viewer():
         # all shooters (except player) shoot their arrows at the same time
 
         for monster in [o for o in Game.objects.values() if
-                        o != self.game.player and o.z == self.game.player.z and isinstance(o,
-                                                                                           Monster) and o.shoot_arrows]:
+                        o != self.game.player and o.z == self.game.player.z and
+                        isinstance(o, Monster) and o.shoot_arrows]:
             # calculate distance to player
             distance = ((monster.x - self.game.player.x) ** 2 + (monster.y - self.game.player.y) ** 2) ** 0.5
             # monster shoots at you if it can, player is in shooting range and player sees monster
-            # print(monster, monster.y, monster.x)
             if Game.fov_map[monster.y][monster.x] and distance < monster.arrow_range:
                 ## FlyObject (start, end)
                 end, victim = self.game.other_arrow((monster.x, monster.y),
-                                                              (self.game.player.x, self.game.player.y))
+                                                    (self.game.player.x, self.game.player.y))
                 a = MagicSprite(startpos=self.tile_to_pixel((monster.x,monster.y)), endpos=self.tile_to_pixel(end))
                 if self.playtime + a.duration > self.animation:
                     self.animation = self.playtime + a.duration
@@ -2226,7 +2267,9 @@ class Viewer():
                     self.explosion_at_tile(startpos=(self.game.player.x, self.game.player.y),
                                            color=(200,0,0),minspeed=1, maxspeed=100)
 
+
         self.animate_sprites_only()
+        self.draw_panel()  # to update player hitpoints
 
         self.game.new_turn()
         self.redraw = True
@@ -2249,7 +2292,7 @@ class Viewer():
             self.allgroup.clear(self.screen, self.spriteless_background)
             self.allgroup.update(seconds)
             self.allgroup.draw(self.screen)
-            self.draw_panel() # TODO: remove? Fragments destroy panel otherwise. making area for Fragment sprite?
+            #self.draw_panel() # TODO: remove? Fragments destroy panel otherwise. making area for Fragment sprite?
             pygame.display.update()
 
     def run(self):
@@ -2341,6 +2384,16 @@ class Viewer():
                             if victim is not None:
                                 self.explosion_at_tile((victim.x, victim.y), age=-a.duration)
                             self.animate_sprites_only()
+                        elif spell == "bleed":
+                            if result:
+                                # play blood animation for 1 second at victimtile (result)
+                                Bleeding(pos=pygame.math.Vector2(self.tile_to_pixel(result)), max_age=0.5)
+                                self.animation = self.playtime + 1.0
+                                self.animate_sprites_only()
+
+
+
+
 
 
 
