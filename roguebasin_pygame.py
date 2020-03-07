@@ -303,6 +303,45 @@ class Flytext(VectorSprite):
             self.move *= self.max_speed
         VectorSprite.update(self, seconds)
 
+class GoldSprite(VectorSprite):
+    """praticle that fly in a complicated path from the gold -pickup area to the side-panel"""
+
+    image = None # will be set from Viewer.create_tiles
+    blackhole = pygame.math.Vector2(0,0) # Vector2  :  will be set from Viewer.init
+    force = 10
+    krit = 15
+    speedlimit = 300
+
+
+    def _overwrite_parameters(self):
+        super()._overwrite_parameters()
+        self.picture = self.image
+        self.undisturbed = 1 + random.random()*1.5  # time without black hole pull
+        self.create_image()
+        self.move = pygame.math.Vector2(random.randint(50, 200),0)
+        self.move.rotate_ip(random.randint(0,360))
+        #self.max_age = 10
+        self.friction = 0.99
+        print("black hole:", self.blackhole)
+
+    def update(self, seconds):
+        super().update(seconds)
+        self.move *= self.friction
+        if self.age < self.undisturbed:
+            return
+        distance =  self.blackhole - self.pos
+        if distance.length() < self.krit:
+            Game.player.gold += 1 # delay, gold is added only after gold-fly animation
+            self.kill()
+        distance.normalize_ip()
+        distance *= self.force
+        self.move += distance #pygame.math.Vector2(0,5)#distance
+        #if self.move.length() > self.speedlimit:
+        #    self.move.normalize_ip()
+        #    self.move *= self.speedlimit
+
+
+
 class FlyingObject(VectorSprite):
     image = None  # will be set from Viewer.create_tiles
 
@@ -354,7 +393,6 @@ class DragonFireSprite(Flytext):
         self.speed = 150  # pixel / second
         super()._overwrite_parameters()  # FlyingObject
     # TODO WEITERMACHEN
-
 
 
 
@@ -1015,9 +1053,11 @@ class Game():
         Dragon(30, 5, 0)
         Dragon(31, 4, 0)
         Shop(7, 1, 0)
-        Gold(2, 1, 0)
+        for a in range(5):
+            Gold(2, 1+a , 0)
         Gold(3,1,0)
         Gold(4,1,0)
+
         for _ in range(15):
             Scroll(4, 4, 0)
             Scroll(5, 4, 0)
@@ -1066,7 +1106,11 @@ class Game():
             for o in myfloor:
                 if isinstance(o, Gold):
                     Game.log.append("You found {} gold!".format(o.value))
-                    self.player.gold += o.value
+                    ## !! self.player.gold += o.value
+                    # delay, gold is added only after gold-fly animation
+                    # animation
+                    for _ in range(o.value):
+                        GoldSprite(pos=pygame.math.Vector2(Viewer.tile_to_pixel((o.x, o.y))))
                     # kill gold from dungeon
                     del Game.objects[o.number]
 
@@ -1691,9 +1735,11 @@ class Viewer():
            default arguments """
         self.game = game
         self.fps = fps
+        # position in pixel where all the gold sprites are flying to:
         Viewer.grid_size = grid_size  # make global readable
         Viewer.width = width
         Viewer.height = height
+        GoldSprite.blackhole = pygame.math.Vector2(Viewer.width - self.panel_width + 60, Viewer.panel_width + 75)
         self.random1 = random.randint(1, 1000)  # necessary for Viewer.wall_and_floor_theme
         self.random2 = random.randint(1, 1000)
         pygame.init()
@@ -1738,11 +1784,13 @@ class Viewer():
 
     def prepare_spritegroups(self):
         self.allgroup = pygame.sprite.LayeredUpdates()  # for drawing
+        self.whole_screen_group = pygame.sprite.Group()
         self.flytextgroup = pygame.sprite.Group()
         #self.cursorgroup = pygame.sprite.Group()
 
         VectorSprite.groups = self.allgroup
         Flytext.groups = self.allgroup, self.flytextgroup
+        GoldSprite.groups = self.allgroup, self.whole_screen_group
         ArrowSprite.groups = self.allgroup
         CursorSprite.groups = self.allgroup
 
@@ -1929,6 +1977,7 @@ class Viewer():
         self.arrow_tiles = (pygame.Surface.subsurface(main_img, (681, 224, 27, 16)),
                            pygame.Surface.subsurface(main_dark_img, (681, 224, 27, 16)))
         # ------ sprites -----
+        GoldSprite.image = pygame.Surface.subsurface(main_img,(462,678,13,9) )
         # arrow looking right, only used for Sprite Animation (arrow on the ground has different picture)
         ArrowSprite.image = pygame.Surface.subsurface(main_img, (808, 224, 22, 7))
         # self.arrow_tiles = ( pygame.Surface.subsurface(main_img, (808,224,22,7)),
@@ -2371,7 +2420,7 @@ class Viewer():
         reset_cursor = True
         log_lines = len(Game.log)
         while running:
-
+            #print("mouse:", pygame.mouse.get_pos())
             self.game.check_player()  # if player has hitpoints left
             if Game.game_over:
                 running = False
@@ -2584,8 +2633,9 @@ class Viewer():
             # ============== draw screen =================
             # screen_without_sprites = self.screen.copy()
             # self.allgroup.clear(bgd=self.screen)
-            self.allgroup.clear(self.screen, self.spriteless_background)
 
+            self.allgroup.clear(self.screen, self.spriteless_background)
+            self.draw_panel()  # always draw panel
             self.allgroup.update(seconds)
 
             # dirtyrects = []
@@ -2617,7 +2667,7 @@ class Viewer():
                 log_lines = len(Game.log)
                 dirtyrects.append((0, Viewer.height - self.log_height, Viewer.width, self.log_height))
 
-            self.draw_panel()  # always draw panel
+
             dirtyrects.append((Viewer.width - self.panel_width, 0, Viewer.panel_width, Viewer.height))
 
             self.redraw = False
