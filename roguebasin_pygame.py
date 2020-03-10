@@ -313,37 +313,40 @@ class GoldSprite(VectorSprite):
 
     image = None # will be set from Viewer.create_tiles
     blackhole = pygame.math.Vector2(0,0) # Vector2  :  will be set from Viewer.init
-    force = 10
-    krit = 15
+    speed = 10
+    krit = 5
+    blackholemass = 10**7
     speedlimit = 300
 
 
     def _overwrite_parameters(self):
         super()._overwrite_parameters()
         self.picture = self.image
-        self.undisturbed = 1 + random.random()*1.5  # time without black hole pull
+        self.undisturbed = 0 + random.random()*0.5  # time without black hole pull
         self.create_image()
         self.move = pygame.math.Vector2(random.randint(50, 200),0)
         self.move.rotate_ip(random.randint(0,360))
         #self.max_age = 10
-        self.friction = 0.99
+        #self.friction = 0.99
         #print("black hole:", self.blackhole)
 
     def update(self, seconds):
         super().update(seconds)
-        self.move *= self.friction
+        #self.move *= self.friction
         if self.age < self.undisturbed:
             return
         distance =  self.blackhole - self.pos
+        acc =  self.blackholemass /  distance.length()**1.8 #2
+
         if distance.length() < self.krit:
             Game.player.gold += 1 # delay, gold is added only after gold-fly animation
             self.kill()
         distance.normalize_ip()
-        distance *= self.force
-        self.move += distance #pygame.math.Vector2(0,5)#distance
-        #if self.move.length() > self.speedlimit:
-        #    self.move.normalize_ip()
-        #    self.move *= self.speedlimit
+        acc *= distance
+        self.move += acc * seconds #pygame.math.Vector2(0,5)#distance
+        if self.move.length() > self.speedlimit:
+            self.move.normalize_ip()
+            self.move *= self.speedlimit
 
 class FlyingObject(VectorSprite):
     image = None  # will be set from Viewer.create_tiles
@@ -1770,7 +1773,7 @@ class Viewer():
         Viewer.grid_size = grid_size  # make global readable
         Viewer.width = width
         Viewer.height = height
-        GoldSprite.blackhole = pygame.math.Vector2(Viewer.width - self.panel_width + 5, Viewer.panel_width + 75)
+        GoldSprite.blackhole = pygame.math.Vector2(Viewer.width - self.panel_width + 10, Viewer.panel_width + 80)
         self.random1 = random.randint(1, 1000)  # necessary for Viewer.wall_and_floor_theme
         self.random2 = random.randint(1, 1000)
         pygame.init()
@@ -1988,6 +1991,8 @@ class Viewer():
         BleedingSprite.image = pygame.Surface.subsurface(feats_img, (248,160,32,22))#(717,417,29,25))
         BlinkSprite.image = pygame.Surface.subsurface(feats_img, (0,384,30,32))
         HealingSprite.image = pygame.Surface.subsurface(main_img, (158,381,15,15))
+        # ---- gui tiles ----
+        self.goldstack_image = pygame.Surface.subsurface(main_img, (507,656,32,32)) # stack of gold
 
     def wall_and_floor_theme(self):
         """select a set of floor/walltiles, depending on level number (z)"""
@@ -2191,7 +2196,8 @@ class Viewer():
             self.game.player.hitpoints, self.game.player.hitpoints_max), x=5, y=35,
               color=(255, 255, 255), font_size=24)
         # -y65 ----------------------
-        write(self.panelscreen, text="Gold: {}".format(
+        self.panelscreen.blit(self.goldstack_image, (5,65))
+        write(self.panelscreen, text="   {}".format(
             self.game.player.gold), x=5, y=65, color=(255, 255, 0), font_size=24)
 
         # --- write cursor information into panel ---
@@ -2302,10 +2308,12 @@ class Viewer():
                 if victim is not None:
                     self.explosion_at_tile(startpos=(self.game.player.x, self.game.player.y),
                                            color=(200,0,0),minspeed=1, maxspeed=100)
+        
         self.animate_sprites_only()
-        self.draw_panel()  # to update player hitpoints
+        #self.draw_panel()  # to update player hitpoints
         old_gold = self.game.player.gold
         self.game.new_turn()
+        
         delta_gold = self.game.player.gold - old_gold
         if delta_gold > 0:
             self.explosion_at_tile(startpos=(self.game.player.x, self.game.player.y),
@@ -2343,6 +2351,13 @@ class Viewer():
         self.redraw = True
         # exittime = 0
         self.spriteless_background = pygame.Surface((Viewer.width, Viewer.height))
+        # fill panel color into spriteless background
+        pygame.draw.rect(self.spriteless_background,(64, 128, 64), (self.width-self.panel_width,
+                                                                    self.panel_width, self.panel_width,
+                                                                    self.height-self.panel_width))
+        #while True:
+        self.screen.blit(self.spriteless_background, (0,0))
+        ###    pygame.display.flip()
         show_range = False
         self.animation = 0  # how many seconds animation should be played until the game accept inputs, new turn etc again
         reset_cursor = True
@@ -2351,6 +2366,17 @@ class Viewer():
             #print("mouse:", pygame.mouse.get_pos())
             self.game.check_player()  # if player has hitpoints left
             if Game.game_over:
+                Flytext(text="Game Over", fontsize=100, pos=pygame.math.Vector2(self.pcx, self.pcy),
+                        move=pygame.math.Vector2(0, -5), acceleration_factor=1.0, color=(20,20,200))
+                for dy, v in enumerate(self.game.player.victims):
+                    #print(v, self.game.player.victims[v])
+                    Flytext(text="you killed {} {}".format(self.game.player.victims[v],v),
+                            pos=pygame.math.Vector2(self.pcx, self.pcy + 50+20 * dy),
+                            move=pygame.math.Vector2(0, -5), acceleration_factor=1.0,
+                            fontsize=25, color=(40,40,240))
+
+                self.animation = self.playtime + 5 + dy* 0.5
+                self.animate_sprites_only()
                 running = False
             milliseconds = self.clock.tick(self.fps)  #
             seconds = milliseconds / 1000
@@ -2489,6 +2515,7 @@ class Viewer():
 
                         if event.key == pygame.K_SPACE:
                             # Game.turn += 1  # wait a turn
+                            Game.log.append("You stay around for one turn")
                             self.new_turn_in_Viewer()
                             # on shop buy 10 hp for one gold
                             for o in Game.objects.values():
@@ -2563,12 +2590,12 @@ class Viewer():
             # screen_without_sprites = self.screen.copy()
             # self.allgroup.clear(bgd=self.screen)
 
-            self.allgroup.clear(self.screen, self.spriteless_background)
-
+            #self.allgroup.clear(self.screen, self.spriteless_background)
+            self.screen.blit(self.spriteless_background, (0,0) )
             self.allgroup.update(seconds)
 
             # dirtyrects = []
-            #self.draw_panel()  # always draw panel #über allgropu draw: münzen sichtbar,  flackert
+            self.draw_panel()  # always draw panel #über allgropu draw: münzen sichtbar,  flackert
             dirtyrects = self.allgroup.draw(self.screen)
             #self.draw_panel()  # always draw panel #unter allgropu draw: münzen unsichtbar, flackert
 
@@ -2601,7 +2628,7 @@ class Viewer():
             #dirtyrects.append((Viewer.width - self.panel_width, 0, Viewer.panel_width, Viewer.height))
 
             self.redraw = False
-            self.draw_panel()
+            #self.draw_panel()
 
 
             # write text below sprites
