@@ -4,11 +4,10 @@ Peter und Anton's roguebasin fork...
 ein roguelike in Python3 / pygame
 
 ## installieren
-
-* unter Linux:
-   sudo apt install python3 python3-pip
-   sudo pip3 install pygame
-   
+ * python3 installieren von http://python.org
+ * pygame für python3 installieren mit 
+   * 'pip install pygame' unter Windows  bzw.
+   * 'sudo pip3 install pygame' unter Linux
    
 
 ## anleitung:
