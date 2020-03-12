@@ -18,4 +18,7 @@ ein roguelike in Python3 / pygame
   * kaufe Leben im Shop mit SPACE
   * sammle Spruchrollen und zaubere mit STRG + a-f (siehe Erklärung rechts im Spiel)
   
+ let's play video:
+ https://youtu.be/D77KX7wM254
+  
   
