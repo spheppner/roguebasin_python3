@@ -369,6 +369,29 @@ class FlyingObject(VectorSprite):
 
         self.set_angle(self.move.angle_to(pygame.math.Vector2(x=1, y=0)))
 
+class FireBallSprite(FlyingObject):
+    """ a sprite flying from startpos to endpos with fixed speed
+        startpos and endpos are in pixel
+    """
+    image = None
+
+    def _overwrite_parameters(self):
+        self.speed = 220  # pixel / second
+        super()._overwrite_parameters()  # FlyingObject
+        # --- values for explosion on impact
+        self.explosion_color = (255, 0, 0)  # orange
+        self.explosion_maxspeed = 50  #
+        self.explosion_minspeed = 20
+        self.explosion_frags = 20
+        self.explosion_duration = 0.5
+
+    def update(self, seconds):
+        # wobble in flight
+        self.set_angle(self.angle +5) # rotate image in flight
+        super().update(seconds)
+        # TODO: zoom?
+
+
 class ArrowSprite(FlyingObject):
     """ a sprite flying from startpos to endpos with fixed speed
         startpos and endpos are in pixel
@@ -880,11 +903,12 @@ class Scroll(Item):
         self.color = (200, 200, 0)
         self.char = "i"
         self.hint = "consumable magic scroll "
-        self.spell = random.choice(("blink", "blink","blink", "blink",
-                                    "bleed", "bleed","bleed", "bleed","bleed", "bleed",
-                                    "magic map", "magic map", "magic map",
-                                    "magic missile", "magic missile", "magic missile",
-                                    "fireball", "heal","heal","heal","heal"))
+        self.spell = random.choice(("blink",
+                                    "bleed",
+                                    "magic map",
+                                    "magic missile",
+                                    "fireball",
+                                    "heal",))
         # disarm onfuse hurt bleed combat bless defense bless bull strenght dragon strenght superman
         # TODO: different image index (i) for different spells
 
@@ -1237,8 +1261,18 @@ class Game():
             for o in [o for o in Game.objects.values() if
                       o.z == self.player.z and o.y == y and o.x == x and isinstance(o, Monster)]:
                 # TODO: arrow/object damage calculation, hit or miss calculation
-                Game.log.append("a {} hit the {} and makes 10 damage!".format(object, o.__class__.__name__))
-                o.hitpoints -= 10
+                if object == "arrow":
+                    damage = 10
+                elif object == "magic missile":
+                    damage = random.randint(5,15)
+                elif object == "fireball":
+                    damage = random.randint(20,40)
+                else:
+                    damage = 5
+
+
+                Game.log.append("a {} hit the {} and makes {} damage!".format(object, o.__class__.__name__, damage))
+                o.hitpoints -= damage
                 vicitm_position = (o.x, o.y)
                 self.remove_dead_monsters(o)  # only if really dead
                 # non-penetration arrow. the flightpath stops here!
@@ -1417,6 +1451,12 @@ class Game():
             return  self.other_arrow((self.player.x, self.player.y),
                                     (Game.cursor_x, Game.cursor_y), "magic missile")
             # return end, victim
+
+        elif spell == "fireball":
+            self.consume_scroll(spell)
+            return self.other_arrow((self.player.x, self.player.y),
+                                    (Game.cursor_x, Game.cursor_y), "fireball")
+
 
         elif spell == "blink":
             # teleport to cursor position
@@ -1602,6 +1642,7 @@ class Game():
         """each floor tile has a small chance to spawn loot"""
         for y, line in enumerate(Game.dungeon[z]):
             for x, tile in enumerate(line):
+                print("tile = ", tile)
                 if tile.char == "." and random.random() < 0.01:
                     loot = random.choice(self.lootlist)
                     loot(x,y,z)
@@ -2029,7 +2070,7 @@ class Viewer():
         monster_tile = make_text("M", font_color=(139, 105, 20), grid_size=self.grid_size)[0]
         Monster.images =  (monster_tile, monster_tile)
         ##self.player_tile = make_text("@", font_color=self.game.player.color, grid_size=self.grid_size)[0]
-        player_tile = pygame.Surface.subsurface(player_img, (153, 1087, 27, 33))
+        player_tile = pygame.Surface.subsurface(player_img, (597, 1087, 23, 32))
         player_tile_r = pygame.transform.flip(player_tile, True, False)
         Player.images = (player_tile, player_tile_r)
         yeti_tile = pygame.Surface.subsurface(player_img, (193, 1279, 32, 32))
@@ -2056,6 +2097,7 @@ class Viewer():
         ArrowSprite.image = pygame.Surface.subsurface(main_img, (808, 224, 22, 7))
         # self.arrow_tiles = ( pygame.Surface.subsurface(main_img, (808,224,22,7)),
         #                     pygame.Surface.subsurface(main_dark_img, (808,224,22,7)))
+        FireBallSprite.image = pygame.Surface.subsurface(main_img,(159,840,16,14))
         MagicMissileSprite.image = pygame.Surface.subsurface(main_img, (449,834,31,5))
         IceBallSprite.image = pygame.Surface.subsurface(main_img, (72,840,21,13)) # magic missile, orange rectangle
         PoisonSpitSprite.image = pygame.Surface.subsurface(main_img, (238,853,10,10))
@@ -2545,11 +2587,17 @@ class Viewer():
                             if victimpos is not None:
                                 self.explosion_at_tile(victimpos, age=-a.duration)
                             self.animate_sprites_only()
+                        elif spell == "fireball":
+                            end, victimpos = result
+                            a = FireBallSprite(startpos=(self.pcx+Viewer.grid_size[0]//2,
+                                                      self.pcy+Viewer.grid_size[1]//2), endpos=self.tile_to_pixel(end, center=True))
+                            self.animation = self.playtime + a.duration
+                            if victimpos is not None:
+                                self.explosion_at_tile(victimpos, age=-a.duration)
+                            self.animate_sprites_only()
                         elif spell == "heal":
                             if result:
                                 self.start_healing_sprites()
-
-
 
                         elif spell == "bleed":
                             if result:
