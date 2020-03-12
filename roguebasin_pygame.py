@@ -27,6 +27,7 @@ import os
 # declare constants
 ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
+#TODO: poblem bei DragonFire: wenn die duration zu klein ist sieht man oft gar keine Explosion
 #TODO: warum gibts keinen Panelscreen, warum ist alles weiß?
 #TODO: different dungeon create methods, see test/DungeonCreator
 #TODO: different graphic engines: pysimplegui/text/arcade/ .. godot?
@@ -377,24 +378,78 @@ class ArrowSprite(FlyingObject):
     def _overwrite_parameters(self):
         self.speed = 200  # pixel / second
         super()._overwrite_parameters()  # FlyingObject
+        # --- values for explosion on impact
+        self.explosion_color = (200, 0, 0)  # orange
+        self.explosion_maxspeed = 20  #
+        self.explosion_minspeed = 10
+        self.explosion_frags = 5
+        self.explosion_duration = 0.3
 
-class MagicSprite(FlyingObject):
-    """ a blue magic missile, usually shot from player"""
-    image = None # will be overwritten by Viewer.create_tiles
+class MagicMissileSprite(FlyingObject):
+    image = None
 
     def _overwrite_parameters(self):
         self.speed = 200  # pixel / second
         super()._overwrite_parameters()  # FlyingObject
+        # --- values for explosion on impact
+        self.explosion_color = None  # random
+        self.explosion_maxspeed = 120  #
+        self.explosion_minspeed = 80
+        self.explosion_frags = 45
+        self.explosion_duration = 0.4
 
-    def update(self, seconds):
-        self.set_angle(self.angle + 10) # rotate image in flight
-        super().update(seconds)
 
-class DragonFireSprite(Flytext):
+class PoisonSpitSprite(FlyingObject):
+
+    image = None
+
+    def _overwrite_parameters(self):
+        self.speed = 32  # pixel / second
+        super()._overwrite_parameters()  # FlyingObject
+        # --- values for explosion on impact
+        self.explosion_color = (20, 30, 240)  # orange
+        self.explosion_maxspeed = 20  #
+        self.explosion_minspeed = 15
+        self.explosion_frags = 25
+        self.explosion_duration = 0.6
+
+
+class IceBallSprite(FlyingObject):
+    """ a blue magic missile, usually shot from player"""
+    image = None # will be overwritten by Viewer.create_tiles
+
+    def _overwrite_parameters(self):
+        self.speed = 80  # pixel / second
+        super()._overwrite_parameters()  # FlyingObject
+        # --- values for explosion on impact
+        self.explosion_color = (50, 50, 250)  # orange
+        self.explosion_maxspeed = 30  #
+        self.explosion_minspeed = 3
+        self.explosion_frags = 15
+        self.explosion_duration = 0.6
+
+    #TODO: cool effect of snowball trail
+    #def update(self, seconds):
+    #    self.set_angle(self.angle + 10) # rotate image in flight
+    #    super().update(seconds)
+
+class DragonFireSprite(FlyingObject):
     """dragon missile"""
     def _overwrite_parameters(self):
         self.speed = 150  # pixel / second
         super()._overwrite_parameters()  # FlyingObject
+        # --- values for explosion on impact
+        self.explosion_color = (250, 160, 0)  # orange
+        self.explosion_maxspeed = 200         #
+        self.explosion_minspeed = 50
+        self.explosion_frags = 30
+        self.explosion_duration = 4.5
+
+    def update(self, seconds):
+        # wobble in flight
+        self.set_angle(self.angle + random.randint(-5,5)) # rotate image in flight
+        super().update(seconds)
+        # TODO: zoom?
 
 class NaturalWeapon():
 
@@ -973,6 +1028,7 @@ class Snake(Monster):
         self.attack = (2, 4)
         self.defense = (3, 3)
         self.damage = (3, 4)
+        self.fighting_range = 3
         self.natural_weapons = [SnakeBite()]
         self.image_name = "snake"
 
@@ -988,6 +1044,7 @@ class Yeti(Monster):
         self.attack = (8, 2)
         self.defense = (4, 3)
         self.damage = (4, 5)
+        self.fighting_range = 15
         self.natural_weapons = [YetiSnowBall(), YetiSlap()]
         self.image_name = "yeti"
 
@@ -1001,7 +1058,7 @@ class Dragon(Monster):
         self.level = 3
         self.immobile = True
         self.shoot_arrows = True
-        self.arrow_range = random.randint(10, 15)
+        self.fighting_range = 15 #random.randint(10, 15)
         self.hitpoints = 50
         self.attack = (6, 3)
         self.defense = (6, 3)
@@ -1081,9 +1138,9 @@ class Game():
         #Yeti(2,2,0)
         Snake(3, 3, 0)
         Yeti(4, 4, 0)
-        #Dragon(33, 6, 0)
-        #Dragon(30, 5, 0)
-        #Dragon(31, 4, 0)
+        Dragon(33, 6, 0)
+        Dragon(30, 5, 0)
+        Dragon(31, 4, 0)
         Shop(7, 1, 0)
         for a in range(5):
             Gold(2, 1+a , 0)
@@ -1755,6 +1812,7 @@ class CursorSprite(VectorSprite):
 
 
 
+
 class Viewer():
     width = 0  # screen x resolution in pixel
     height = 0  # screen y resolution in pixel
@@ -1791,6 +1849,9 @@ class Viewer():
         self.radarscreen = pygame.surface.Surface((Viewer.panel_width,
                                                    Viewer.panel_width))  # same width and height as panel, sits in topright corner of screen
         self.panelscreen = pygame.surface.Surface((Viewer.panel_width, Viewer.height - Viewer.panel_width))
+        self.panelscreen.fill(((64, 128, 64)))
+        self.panelscreen0 = pygame.surface.Surface((Viewer.panel_width, Viewer.height - Viewer.panel_width))
+        self.panelscreen0.fill(((64, 128, 64)))
         self.logscreen = pygame.surface.Surface((Viewer.width - Viewer.panel_width, Viewer.log_height))
         # radar screen center
         self.rcx = Viewer.panel_width // 2
@@ -1840,19 +1901,27 @@ class Viewer():
         return (x - self.pcx) // Viewer.grid_size[0]  , (y-self.pcy) // Viewer.grid_size[1]
 
     @staticmethod
-    def explosion_at_tile(startpos, color=None, frags=None, minspeed=None, maxspeed=None, age=-2, gravity=None):
+    def explosion_at_tile(startpos, color=None, frags=None, minspeed=None, maxspeed=None, age=-2, gravity=None, duration=None):
         """takes a tile coordinate (x,y) and starts explosion animation there"""
         x,y = Viewer.tile_to_pixel(startpos, center=True)
         for _ in range(50 if frags is None else frags):
             mo = pygame.math.Vector2(x=random.randint(5 if minspeed is None else minspeed,
                                                     150 if maxspeed is None else maxspeed),y =0)
             mo.rotate_ip(random.randint(0,360))
-            duration = random.random() * 1.5 + 0.5 # between half and 2 seconds
+            if duration is None:
+                duration = random.random() * 1.5 + 0.5 # between half and 2 seconds
+
             if color is None:
-                color = (50,50,random.randint(200,255)) # light blue?
-            c = (minmax(color[0], 0, 255),
-                 minmax(color[1], 0, 255),
-                 minmax(color[2], 0, 255))
+                c = [random.randint(1,255),random.randint(1,255),random.randint(1,255)] # any color except black
+            else:
+                c = color
+            # randomize a little bit each color value
+            for value in c:
+                value += random.randint(-20,20)
+            # sanity check for colors
+            c = (minmax(c[0], 0, 255),
+                 minmax(c[1], 0, 255),
+                 minmax(c[2], 0, 255))
             FragmentSprite(pos=pygame.math.Vector2(x,y), move = mo,
                      max_age = duration, age = age, color=c,
                      kill_on_edge = True, gravity=gravity)
@@ -1913,7 +1982,8 @@ class Viewer():
         except:
             print("no folder 'data' or no jpg files in it")
             self.background = pygame.Surface(self.screen.get_size()).convert()
-            self.background.fill((255, 255, 255))  # fill background white
+            self.background.fill((0, 0, 0))  # fill background #
+            # TODO: background füllen mit logscreen/panelscreen farbe
 
         self.background = pygame.transform.scale(self.background,
                                                  (Viewer.width, Viewer.height))
@@ -1986,7 +2056,9 @@ class Viewer():
         ArrowSprite.image = pygame.Surface.subsurface(main_img, (808, 224, 22, 7))
         # self.arrow_tiles = ( pygame.Surface.subsurface(main_img, (808,224,22,7)),
         #                     pygame.Surface.subsurface(main_dark_img, (808,224,22,7)))
-        MagicSprite.image = pygame.Surface.subsurface(main_img, (72,840,21,13)) # magic missile, orange rectangle
+        MagicMissileSprite.image = pygame.Surface.subsurface(main_img, (449,834,31,5))
+        IceBallSprite.image = pygame.Surface.subsurface(main_img, (72,840,21,13)) # magic missile, orange rectangle
+        PoisonSpitSprite.image = pygame.Surface.subsurface(main_img, (238,853,10,10))
         DragonFireSprite.image = pygame.Surface.subsurface(main_img,(24,841,16,14) )
         BleedingSprite.image = pygame.Surface.subsurface(feats_img, (248,160,32,22))#(717,417,29,25))
         BlinkSprite.image = pygame.Surface.subsurface(feats_img, (0,384,30,32))
@@ -2065,6 +2137,14 @@ class Viewer():
             return
 
         self.screen.blit(surface, (x, y))
+
+    def start_healing_sprites(self):
+        for _ in range(15):
+            p = pygame.math.Vector2(self.pcx + Viewer.grid_size[0] // 2 + random.randint(-20, 20),
+                                    self.pcy + Viewer.grid_size[1])
+            m = pygame.math.Vector2(0, -random.random() * 15 - 3)
+            a = random.random() * -1.5
+            HealingSprite(pos=p, move=m, age=a, max_age=2)
 
     def draw_dungeon(self):
         z = self.game.player.z
@@ -2184,7 +2264,8 @@ class Viewer():
     def draw_panel(self):
         #print("inside paneldraw!")
         # fill panelscreen with color
-        self.panelscreen.fill((64, 128, 64))
+        self.panelscreen.blit(self.panelscreen0, (0,0))
+        #self.panelscreen.fill((64, 128, 64))
         # write stuff in the panel
         # -y5------------
         write(self.panelscreen, text="dungeon: {}".format(self.game.player.z), x=5, y=5, color=(255, 255, 255))
@@ -2297,17 +2378,31 @@ class Viewer():
             # calculate distance to player
             distance = ((monster.x - self.game.player.x) ** 2 + (monster.y - self.game.player.y) ** 2) ** 0.5
             # monster shoots at you if it can, player is in shooting range and player sees monster
-            if Game.fov_map[monster.y][monster.x] and distance < monster.arrow_range:
+            if Game.fov_map[monster.y][monster.x] and distance < monster.fighting_range:
                 ## FlyObject (start, end)
                 end, victim = self.game.other_arrow((monster.x, monster.y),
                                                     (self.game.player.x, self.game.player.y), object="fire")
                 start = self.tile_to_pixel((monster.x, monster.y), center=True)
-                a = MagicSprite(startpos=start, endpos=self.tile_to_pixel(end, center=True))
+                # decide tpye of flying object
+                if isinstance(monster, Dragon):
+                    flyclass = DragonFireSprite
+                if isinstance(monster, Yeti):
+                    flyclass = IceBallSprite
+                if isinstance(monster, Snake):
+                    flyclass = PoisonSpitSprite
+                #a = IceBallSprite(startpos=start, endpos=self.tile_to_pixel(end, center=True))
+                a = flyclass(startpos=start, endpos=self.tile_to_pixel(end, center=True))
                 if self.playtime + a.duration > self.animation:
                     self.animation = self.playtime + a.duration
+                # make a explosion on impact (at the player)
                 if victim is not None:
                     self.explosion_at_tile(startpos=(self.game.player.x, self.game.player.y),
-                                           color=(200,0,0),minspeed=1, maxspeed=100)
+                                           color=a.explosion_color,
+                                           minspeed=a.explosion_minspeed,
+                                           maxspeed=a.explosion_maxspeed,
+                                           frags=a.explosion_frags,
+                                           duration = a.explosion_duration,
+                                           age=-a.duration)
         
         self.animate_sprites_only()
         #self.draw_panel()  # to update player hitpoints
@@ -2350,7 +2445,7 @@ class Viewer():
         self.game.make_fov_map()
         self.redraw = True
         # exittime = 0
-        self.spriteless_background = pygame.Surface((Viewer.width, Viewer.height))
+        self.spriteless_background = pygame.Surface((Viewer.width-Viewer.panel_width, Viewer.height))
         # fill panel color into spriteless background
         pygame.draw.rect(self.spriteless_background,(64, 128, 64), (self.width-self.panel_width,
                                                                     self.panel_width, self.panel_width,
@@ -2444,27 +2539,23 @@ class Viewer():
                         # --- spell animations ----
                         if spell == "magic missile":
                             end, victimpos = result
-                            a = MagicSprite(startpos=(self.pcx+Viewer.grid_size[0]//2,
+                            a = MagicMissileSprite(startpos=(self.pcx+Viewer.grid_size[0]//2,
                                                       self.pcy+Viewer.grid_size[1]//2), endpos=self.tile_to_pixel(end, center=True))
                             self.animation = self.playtime + a.duration
-                            if victimpos2 is not None:
+                            if victimpos is not None:
                                 self.explosion_at_tile(victimpos, age=-a.duration)
                             self.animate_sprites_only()
                         elif spell == "heal":
                             if result:
-                                for _ in range(15):
-                                    p = pygame.math.Vector2(self.pcx + Viewer.grid_size[0]//2 + random.randint(-20,20),
-                                                            self.pcy + Viewer.grid_size[1])
-                                    m = pygame.math.Vector2(0, -random.random()* 15 -3)
-                                    a = random.random() * -1.5
-                                    HealingSprite(pos=p, move=m, age=a, max_age=2)
+                                self.start_healing_sprites()
+
 
 
                         elif spell == "bleed":
                             if result:
                                 # play blood animation for 1 second at victimtile (result)
                                 duration = 0.45
-                                BleedingSprite(pos=pygame.math.Vector2(self.tile_to_pixel(result, center=True)), max_age=duration, zoom_delta = 0.1)
+                                BleedingSprite(pos=pygame.math.Vector2(self.tile_to_pixel(result, center=False)), max_age=duration, zoom_delta = 0.1)
                                 self.animation = self.playtime + duration
                                 self.animate_sprites_only()
 
@@ -2516,8 +2607,8 @@ class Viewer():
                         if event.key == pygame.K_SPACE:
                             # Game.turn += 1  # wait a turn
                             Game.log.append("You stay around for one turn")
-                            self.new_turn_in_Viewer()
-                            # on shop buy 10 hp for one gold
+
+                            # -----on shop buy 10 hp for one gold------
                             for o in Game.objects.values():
                                 if (o.z == self.game.player.z and
                                         o.x == self.game.player.x and
@@ -2527,8 +2618,11 @@ class Viewer():
                                     # and o.__class__.__name__=="Shop"):
                                     self.game.player.gold -= 1
                                     self.game.player.hitpoints += 10
+                                    self.start_healing_sprites()
 
-                            self.redraw = True
+                            self.new_turn_in_Viewer()
+
+                            #self.redraw = True
 
                         if event.key == pygame.K_x:
                             Flytext(text="Hallo Horst", pos=pygame.math.Vector2(300, 300), move=pygame.math.Vector2(0, -10),
@@ -2642,7 +2736,7 @@ class Viewer():
             #self.cursor.pos += pygame.math.Vector2(Viewer.grid_size[0]//2, Viewer.grid_size[1]//2) # center on tile
             # -------- next frame -------------
 
-            pygame.display.update(dirtyrects)
+            #pygame.display.update(dirtyrects)
             pygame.display.flip()
         # -----------------------------------------------------
         pygame.mouse.set_visible(True)
