@@ -1590,9 +1590,12 @@ class Game():
             # 70% chance for 1 monster, 15% for 2, 5% for 3
             for _ in range(randomizer([0.1, 0.7,0.15,0.05])):
                 mo = random.choice(self.levelmonsters[:z]) # if z > len(levelmonsters), take any monster
-                x = random.randint(room.x1, room.x2)
-                y = random.randint(room.y1, room.y2)
-                mo(x,y,z)
+                x = random.randint(room.x1+1, room.x2-1)
+                y = random.randint(room.y1+1, room.y2-1)
+                try:
+                    mo(x,y,z)
+                except:
+                    print("problem with placing monster: {}")
 
 
     def place_loot(self, z):
