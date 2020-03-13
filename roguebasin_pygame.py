@@ -2520,7 +2520,7 @@ class Viewer():
             self.game.check_player()  # if player has hitpoints left
             if Game.game_over:
                 Flytext(text="Game Over", fontsize=100, pos=pygame.math.Vector2(self.pcx, self.pcy),
-                        move=pygame.math.Vector2(0, -5), acceleration_factor=1.0, color=(20,20,200))
+                        move=pygame.math.Vector2(0, -5), acceleration_factor=1.0, color=(200,20,20))
                 for dy, v in enumerate(self.game.player.victims):
                     #print(v, self.game.player.victims[v])
                     Flytext(text="you killed {} {}".format(self.game.player.victims[v],v),
@@ -2696,7 +2696,17 @@ class Viewer():
                             # go up a level
                             if self.game.use_stairs():
                                 self.redraw = True
-                                self.wall_and_floor_theme()  # new walls and floor colors
+                                self.wall_and_floor_theme() # new walls and floor colors
+                                #if self.game.player.z == 100:
+                                #    Flytext("You have won", fontsize=64, color=(230,230,25),
+                                #            pos=pygame.math.Vector2(400,400),
+                                #            move=pygame.math.Vector2(-20,0))
+                                #    self.animation = self.playtime + 5
+                                #    self.animate_sprites_only()
+                                #    Game.game_over = True
+
+
+
 
                         if event.key == pygame.K_PLUS:
                             if event.mod & pygame.KMOD_SHIFT:
