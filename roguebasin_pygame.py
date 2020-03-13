@@ -948,6 +948,7 @@ class Shop(Immobile):
         self.color = (200, 200, 0)
         self.char = "$"
         self.hint = "press Space to buy hp"
+        self.closed = False
 
 class StairUp(Immobile):
     """a stair, going upwards < or downwards >"""
@@ -1099,7 +1100,7 @@ class Player(Monster):
         self.char = "@"
         self.color = (0, 0, 255)
         self.hitpoints = 100
-        self.hitpoints_max = 100
+        self.hitpoints_max = 125
         self.attack = (3, 6)
         self.defense = (3, 5)
         self.damage = (4, 5)
@@ -1189,6 +1190,45 @@ class Game():
         self.place_loot(z=1)
 
         self.turn = 1
+
+    def wait_a_turn(self):
+        Game.log.append("You stay around for one turn")
+
+    def shopping(self):
+        """shop hp for gold if player stays on a shop
+        otherwise, just wait a turn doing nothing
+        return True if shopping sucessfull, otherwise return False"""
+        # -----on shop buy 10 hp for one gold------
+        for o in [o for o in Game.objects.values() if o.z == self.player.z and
+                  o.x == self.player.x and  o.y == self.player.y and
+                  isinstance(o, Shop)]:
+            # player is in a shop
+            if o.closed:
+                Game.log.append("This shop has gone out of business. Find another shop!")
+                return False
+            if self.player.gold <= 0:
+                Game.log.append("You found a shop but you lack Gold to buy anything :-(")
+                return False
+            # player is in shop and has gold
+            if self.player.hitpoints >= self.player.hitpoints_max:
+                Game.log.append("You are already at your maximum health. Shopping is useless now.")
+                return False
+            # shopping
+            self.player.gold -= 1
+            self.player.hitpoints += 10
+            self.player.hitpoints = min(self.player.hitpoints, self.player.hitpoints_max)
+            Game.log.append("You spent one gold for healing")
+            # 20% chance that shop dissapears
+            if random.random() < 0.2:
+                o.closed = True
+                Game.log.append("The shop is closed for business")
+            return True
+        else: # no shop found here
+            self.wait_a_turn()
+            return False
+
+
+
 
 
     def new_turn(self):
@@ -2621,27 +2661,10 @@ class Viewer():
 
                         if event.key == pygame.K_SPACE:
                             # Game.turn += 1  # wait a turn
-                            Game.log.append("You stay around for one turn")
-
-                            # -----on shop buy 10 hp for one gold------
-                            for o in Game.objects.values():
-                                if (o.z == self.game.player.z and
-                                        o.x == self.game.player.x and
-                                        o.y == self.game.player.y and
-                                        self.game.player.gold > 0 and
-                                        isinstance(o, Shop)):
-                                    # and o.__class__.__name__=="Shop"):
-                                    self.game.player.gold -= 1
-                                    self.game.player.hitpoints += 10
-                                    self.start_healing_sprites()
-
+                            if self.game.shopping():
+                                 self.start_healing_sprites()
                             self.new_turn_in_Viewer()
 
-                            #self.redraw = True
-
-                        #if event.key == pygame.K_x:
-                        #    Flytext(text="Hallo Horst", pos=pygame.math.Vector2(300, 300), move=pygame.math.Vector2(0, -10),
-                        #            max_age=15)
 
                         if event.key == pygame.K_f:
                             # fire arrow to cursor
