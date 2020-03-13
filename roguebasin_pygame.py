@@ -1237,7 +1237,7 @@ class Game():
         # TODO: randomized / formula damage calculation
         # check if line of tiles in arrow path
         flightpath = get_line(shooterposition, targetposition)
-        #victimpositions = [] # TODO: list of victimpositions (area damage, penetrating arrow)
+        victimposlist = [] # TODO: list of victimpositions (area damage, penetrating arrow)
         for i, (x, y) in enumerate(flightpath):
             if i == 0:         # flightpath = flightpath[1:] # remove first tile, because it is blocked by shooter
                 continue  # don't look for objects at shooterposition
@@ -1250,24 +1250,23 @@ class Game():
                       o.z == self.player.z and o.y == y and o.x == x and isinstance(o, Monster)]:
                 # TODO: arrow/object damage calculation, hit or miss calculation
                 if object == "arrow":
-                    damage = 10
+                    damage = random.randint(5,10)
                 elif object == "magic missile":
-                    damage = random.randint(5,15)
+                    damage = random.randint(15,15)
                 elif object == "fireball":
                     damage = random.randint(20,40)
                 else:
-                    damage = 5
-
-
+                    damage = 4 # TODO testen ob das jemals vorkommt
+                # example: a fireball hit the Yeti and makes 20 damage
                 Game.log.append("a {} hit the {} and makes {} damage!".format(object, o.__class__.__name__, damage))
                 o.hitpoints -= damage
-                vicitm_position = (o.x, o.y)
+                victimposlist.append((o.x, o.y))
                 self.remove_dead_monsters(o)  # only if really dead
                 # non-penetration arrow. the flightpath stops here!
                 # TODO: penetration arrow
                 # return flightpath[:i]
-                return flightpath[i], vicitm_position
-        return targetposition, None  # no victim
+                return flightpath[i], victimposlist
+        return targetposition, []  # no victim
         # print("flightpath", flightpath)
 
     def player_arrow(self):
@@ -2384,7 +2383,7 @@ class Viewer():
             # monster shoots at you if it can, player is in shooting range and player sees monster
             if Game.fov_map[monster.y][monster.x] and distance < monster.fighting_range:
                 ## FlyObject (start, end)
-                end, victim = self.game.other_arrow((monster.x, monster.y),
+                end, victimpos = self.game.other_arrow((monster.x, monster.y),
                                                     (self.game.player.x, self.game.player.y), object="fire")
                 start = self.tile_to_pixel((monster.x, monster.y), center=True)
                 # decide tpye of flying object
@@ -2399,7 +2398,7 @@ class Viewer():
                 if self.playtime + a.duration > self.animation:
                     self.animation = self.playtime + a.duration
                 # make a explosion on impact (at the player)
-                if victim is not None:
+                if len(victimpos) > 0:
                     self.explosion_at_tile(startpos=(self.game.player.x, self.game.player.y),
                                            color=a.explosion_color,
                                            minspeed=a.explosion_minspeed,
@@ -2542,20 +2541,22 @@ class Viewer():
                         result =  self.game.cast(spell)  # sucessfull casting -> new turn
                         # --- spell animations ----
                         if spell == "magic missile":
-                            end, victimpos = result
+                            end, victimposlist = result
                             a = MagicMissileSprite(startpos=(self.pcx+Viewer.grid_size[0]//2,
                                                       self.pcy+Viewer.grid_size[1]//2), endpos=self.tile_to_pixel(end, center=True))
                             self.animation = self.playtime + a.duration
-                            if victimpos is not None:
-                                self.explosion_at_tile(victimpos, age=-a.duration)
+                            if len(victimposlist) > 0:
+                                for victimpos in victimposlist:
+                                    self.explosion_at_tile(victimpos, age=-a.duration)
                             self.animate_sprites_only()
                         elif spell == "fireball":
-                            end, victimpos = result
+                            end, victimposlist = result
                             a = FireBallSprite(startpos=(self.pcx+Viewer.grid_size[0]//2,
                                                       self.pcy+Viewer.grid_size[1]//2), endpos=self.tile_to_pixel(end, center=True))
                             self.animation = self.playtime + a.duration
-                            if victimpos is not None:
-                                self.explosion_at_tile(victimpos, age=-a.duration)
+                            if len(victimposlist) > 0:
+                                for victimpos in victimposlist:
+                                    self.explosion_at_tile(victimpos, age=-a.duration)
                             self.animate_sprites_only()
                         elif spell == "heal":
                             if result:
@@ -2634,9 +2635,9 @@ class Viewer():
 
                             #self.redraw = True
 
-                        if event.key == pygame.K_x:
-                            Flytext(text="Hallo Horst", pos=pygame.math.Vector2(300, 300), move=pygame.math.Vector2(0, -10),
-                                    max_age=15)
+                        #if event.key == pygame.K_x:
+                        #    Flytext(text="Hallo Horst", pos=pygame.math.Vector2(300, 300), move=pygame.math.Vector2(0, -10),
+                        #            max_age=15)
 
                         if event.key == pygame.K_f:
                             # fire arrow to cursor
@@ -2646,7 +2647,7 @@ class Viewer():
                                                           self.pcy+Viewer.grid_size[1]//2),
                                                 endpos=self.tile_to_pixel(end, center=True))
                                 self.animation = self.playtime + a.duration
-                                if victimpos is not None:
+                                if len(victimpos) > 0:
                                     pass  # todo victim impact animation
 
                                 self.animate_sprites_only()
