@@ -943,8 +943,15 @@ class Immobile(Object):
 class Shop(Immobile):
     """a shop to trade items"""
 
+    images_closed = []
+
+    def close_shop(self):
+        self.closed = True
+        self.images = Shop.images_closed
+
     def _overwrite(self):
         super()._overwrite()
+        #self.images = Shop.images
         self.color = (200, 200, 0)
         self.char = "$"
         self.hint = "press Space to buy hp"
@@ -1220,7 +1227,7 @@ class Game():
             Game.log.append("You spent one gold for healing")
             # 20% chance that shop dissapears
             if random.random() < 0.2:
-                o.closed = True
+                o.close_shop()  # = True
                 Game.log.append("The shop is closed for business")
             return True
         else: # no shop found here
@@ -2090,6 +2097,9 @@ class Viewer():
         # --- item/immobile tiles (scrolls etc) with light and dark
         Shop.images = (pygame.Surface.subsurface(feats_img, (439, 192, 32, 32)),
                      pygame.Surface.subsurface(feats_dark_img, (439, 192, 32, 32)))
+        Shop.images_closed = (pygame.Surface.subsurface(feats_img, (695, 192, 32, 32)),
+                       pygame.Surface.subsurface(feats_dark_img, (695, 192, 32, 32)))
+
         Gold.images = (pygame.Surface.subsurface(main_img, (207, 655, 26, 20)),
                        pygame.Surface.subsurface(main_dark_img, (207, 655, 26, 20)))
         Scroll.images = (pygame.Surface.subsurface(main_img, (188, 412, 27, 28)),
@@ -2222,6 +2232,7 @@ class Viewer():
                 for o in [o for o in Game.objects.values() if
                           isinstance(o, Immobile) and o.z == z and
                           o.x == x and o.y == y]:
+                    #print(dark)
                     c = o.images[dark]
                     if dark and not map_tile.explored:
                             continue # skip
