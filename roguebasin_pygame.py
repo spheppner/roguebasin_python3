@@ -922,7 +922,7 @@ class Gold(Item):
         super()._overwrite()
         self.color = (200, 200, 0)
         self.char = "*"
-        self.value = random.randint(1, 100)
+        self.value = random.randint(1, 10)
 
 class Arrows(Item):
 
@@ -1161,8 +1161,8 @@ class Game():
         Dragon(30, 5, 0)
         Dragon(31, 4, 0)
         Shop(7, 1, 0)
-        for a in range(5):
-            Gold(2, 1+a , 0)
+        #for a in range(5):
+        #    Gold(2, 1+a , 0)
         Gold(3,1,0)
         Gold(4,1,0)
 
@@ -1590,12 +1590,13 @@ class Game():
             # 70% chance for 1 monster, 15% for 2, 5% for 3
             for _ in range(randomizer([0.1, 0.7,0.15,0.05])):
                 mo = random.choice(self.levelmonsters[:z]) # if z > len(levelmonsters), take any monster
-                x = random.randint(room.x1+1, room.x2-1)
-                y = random.randint(room.y1+1, room.y2-1)
                 try:
-                    mo(x,y,z)
+                    x = random.randint(room.x1+1, room.x2-1)
+                    y = random.randint(room.y1+1, room.y2-1)
                 except:
-                    print("problem with placing monster: {}")
+                    print("problem with placing monster in room:{}".format(room))
+                    return
+                mo(x,y,z) # create a new monster
 
 
     def place_loot(self, z):
@@ -2706,10 +2707,11 @@ class Viewer():
 
             if len(self.allgroup) >1:
                 self.draw_radar()
-                self.draw_panel()  # always draw panel #über allgropu draw: münzen sichtbar,  flackert
+                #self.draw_panel()  # always draw panel #über allgropu draw: münzen sichtbar,  flackert
                 # append radar and panel to dirtyrects
-                dirtyrects.append(pygame.Rect(Viewer.width-Viewer.panel_width, 0, Viewer.panel_width, Viewer.height))
-            #self.draw_panel()  # always draw panel #unter allgropu draw: münzen unsichtbar, flackert
+                #dirtyrects.append(pygame.Rect(Viewer.width-Viewer.panel_width, 0, Viewer.panel_width, Viewer.height))
+            self.draw_panel()  # always draw panel #unter allgropu draw: münzen unsichtbar, flackert
+            dirtyrects.append(pygame.Rect(Viewer.width - Viewer.panel_width, 0, Viewer.panel_width, Viewer.height))
             dirtyrects.extend(self.allgroup.draw(self.screen))
 
 
